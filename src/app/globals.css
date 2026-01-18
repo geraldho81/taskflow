@@ -1,26 +1,313 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Warm neutral palette */
+  --bg-primary: #FAFAF8;
+  --bg-secondary: #F5F5F3;
+  --bg-card: #FFFFFF;
+  --bg-hover: #F0F0EE;
+
+  /* Text colors */
+  --text-primary: #1A1A1A;
+  --text-secondary: #6B6B6B;
+  --text-tertiary: #9B9B9B;
+
+  /* Border colors */
+  --border-light: #E8E8E6;
+  --border-medium: #D4D4D2;
+
+  /* Tag colors - soft pastels */
+  --tag-green: #E8F5E8;
+  --tag-green-text: #2D6A2D;
+  --tag-blue: #E8F0F8;
+  --tag-blue-text: #2D5A8A;
+  --tag-purple: #F0E8F5;
+  --tag-purple-text: #6A2D8A;
+  --tag-orange: #FDF2E8;
+  --tag-orange-text: #8A5A2D;
+  --tag-pink: #F8E8F0;
+  --tag-pink-text: #8A2D6A;
+  --tag-teal: #E8F5F3;
+  --tag-teal-text: #2D6A5A;
+
+  /* Column backgrounds */
+  --col-todo: #FAFAF8;
+  --col-doing: #F8FAFA;
+  --col-done: #F8FAF8;
+
+  /* Accent */
+  --accent: #4A7C59;
+  --accent-hover: #3D6649;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.08);
+
+  /* Fonts */
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: var(--font-dm-sans), -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: var(--bg-primary);
+  --color-foreground: var(--text-primary);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-medium);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}
+
+/* Selection */
+::selection {
+  background: var(--accent);
+  color: white;
+}
+
+/* Focus styles */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Transitions */
+.transition-smooth {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Tag styles */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+/* Content Creation - Coral/Salmon */
+.tag-content {
+  background: #FEE2E2;
+  color: #991B1B;
+}
+
+/* SEO - Green */
+.tag-seo {
+  background: #DCFCE7;
+  color: #166534;
+}
+
+/* Social Media - Pink/Magenta */
+.tag-social {
+  background: #FCE7F3;
+  color: #9D174D;
+}
+
+/* Paid Ads - Yellow/Amber */
+.tag-ads {
+  background: #FEF3C7;
+  color: #92400E;
+}
+
+/* Analytics - Indigo */
+.tag-analytics {
+  background: #E0E7FF;
+  color: #3730A3;
+}
+
+/* Urgent - Red/Orange */
+.tag-urgent {
+  background: #FFEDD5;
+  color: #C2410C;
+}
+
+/* Research - Purple */
+.tag-research {
+  background: #F3E8FF;
+  color: #6B21A8;
+}
+
+/* Client Meeting - Teal */
+.tag-meeting {
+  background: #CCFBF1;
+  color: #115E59;
+}
+
+/* Strategy - Blue */
+.tag-strategy {
+  background: #DBEAFE;
+  color: #1E40AF;
+}
+
+/* Design - Emerald */
+.tag-design {
+  background: #D1FAE5;
+  color: #065F46;
+}
+
+/* Checkbox styles */
+.checkbox-custom {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--border-medium);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.checkbox-custom:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.checkbox-custom:checked::after {
+  content: '';
+  position: absolute;
+  left: 4.5px;
+  top: 1.5px;
+  width: 4px;
+  height: 8px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.checkbox-custom:hover {
+  border-color: var(--accent);
+}
+
+/* Button base */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: none;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+}
+
+.btn-secondary {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-light);
+}
+
+.btn-secondary:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-medium);
+}
+
+/* Input base */
+.input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: var(--font-body);
+  color: var(--text-primary);
+  background: var(--bg-card);
+  transition: all 0.15s ease;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(74, 124, 89, 0.1);
+}
+
+.input::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* Card base */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s ease;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-medium);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease forwards;
+}
+
+.animate-slideIn {
+  animation: slideIn 0.3s ease forwards;
 }

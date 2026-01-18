@@ -1,0 +1,416 @@
+'use client'
+
+import { useState, useMemo, useEffect } from 'react'
+import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, DragOverlay, pointerWithin } from '@dnd-kit/core'
+import { Task, TaskStatus, SubTask, getTagInfo } from '@/types/database'
+import { createClient } from '@/lib/supabase/client'
+import Column from './Column'
+import TaskCard from './TaskCard'
+import TaskModal from './TaskModal'
+import ConfirmModal from './ConfirmModal'
+import Header from './Header'
+
+interface KanbanBoardProps {
+  initialTasks: Task[]
+  userEmail: string
+}
+
+const COLUMNS: { id: TaskStatus; title: string }[] = [
+  { id: 'queue', title: 'TO DO' },
+  { id: 'in_progress', title: 'DOING' },
+  { id: 'completed', title: 'DONE' },
+]
+
+export default function KanbanBoard({ initialTasks, userEmail }: KanbanBoardProps) {
+  const [tasks, setTasks] = useState<Task[]>(initialTasks)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [activeTask, setActiveTask] = useState<Task | null>(null)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; task: Task | null }>({
+    isOpen: false,
+    task: null,
+  })
+  const [isMounted, setIsMounted] = useState(false)
+
+  // Prevent hydration mismatch from dnd-kit
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
+  const filteredTasks = useMemo(() => {
+    if (!searchQuery.trim()) return tasks
+    const query = searchQuery.toLowerCase()
+    return tasks.filter((task) => {
+      // Search in title
+      if (task.title.toLowerCase().includes(query)) return true
+      // Search in description
+      if (task.description && task.description.toLowerCase().includes(query)) return true
+      // Search in tags (both the tag ID and display label)
+      if (task.tags && task.tags.some((tag) => {
+        const tagInfo = getTagInfo(tag)
+        return tag.toLowerCase().includes(query) || tagInfo.label.toLowerCase().includes(query)
+      })) return true
+      // Search in subtasks
+      if (task.subtasks && (task.subtasks as SubTask[]).some((subtask) =>
+        subtask.text.toLowerCase().includes(query)
+      )) return true
+      return false
+    })
+  }, [tasks, searchQuery])
+
+  const getTasksByStatus = (status: TaskStatus) => {
+    return filteredTasks
+      .filter((task) => task.status === status)
+      .sort((a, b) => a.position - b.position)
+  }
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const task = tasks.find((t) => t.id === event.active.id)
+    if (task) setActiveTask(task)
+  }
+
+  const handleDragOver = (event: DragOverEvent) => {
+    const { active, over } = event
+    if (!over) return
+
+    const activeId = active.id as string
+    const overId = over.id as string
+
+    const activeTask = tasks.find((t) => t.id === activeId)
+    if (!activeTask) return
+
+    const overColumn = COLUMNS.find((c) => c.id === overId)
+    if (overColumn && activeTask.status !== overColumn.id) {
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === activeId ? { ...t, status: overColumn.id } : t
+        )
+      )
+      return
+    }
+
+    const overTask = tasks.find((t) => t.id === overId)
+    if (overTask && activeTask.status !== overTask.status) {
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === activeId ? { ...t, status: overTask.status } : t
+        )
+      )
+    }
+  }
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+    setActiveTask(null)
+
+    if (!over) return
+
+    const activeId = active.id as string
+    const overId = over.id as string
+
+    const activeTask = tasks.find((t) => t.id === activeId)
+    if (!activeTask) return
+
+    let targetStatus: TaskStatus = activeTask.status
+    const overColumn = COLUMNS.find((c) => c.id === overId)
+    if (overColumn) {
+      targetStatus = overColumn.id
+    } else {
+      const overTask = tasks.find((t) => t.id === overId)
+      if (overTask) {
+        targetStatus = overTask.status
+      }
+    }
+
+    const tasksInColumn = tasks
+      .filter((t) => t.status === targetStatus && t.id !== activeId)
+      .sort((a, b) => a.position - b.position)
+
+    let newPosition: number
+    if (overColumn) {
+      newPosition = tasksInColumn.length > 0
+        ? Math.max(...tasksInColumn.map((t) => t.position)) + 1
+        : 0
+    } else {
+      const overTask = tasks.find((t) => t.id === overId)
+      if (overTask) {
+        const overIndex = tasksInColumn.findIndex((t) => t.id === overId)
+        newPosition = overIndex >= 0 ? overIndex : tasksInColumn.length
+      } else {
+        newPosition = tasksInColumn.length
+      }
+    }
+
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === activeId
+          ? { ...t, status: targetStatus, position: newPosition }
+          : t
+      )
+    )
+
+    const supabase = createClient()
+    await supabase
+      .from('tasks')
+      .update({ status: targetStatus, position: newPosition })
+      .eq('id', activeId)
+  }
+
+  const handleCreateTask = async (data: {
+    title: string
+    description?: string
+    deadline?: string
+    tags?: string[]
+    subtasks?: SubTask[]
+  }) => {
+    const supabase = createClient()
+    const queueTasks = tasks.filter((t) => t.status === 'queue')
+    const maxPosition = queueTasks.length > 0
+      ? Math.max(...queueTasks.map((t) => t.position))
+      : -1
+
+    const { data: newTask, error } = await supabase
+      .from('tasks')
+      .insert({
+        title: data.title,
+        description: data.description || null,
+        deadline: data.deadline || null,
+        tags: data.tags || [],
+        subtasks: data.subtasks || [],
+        attachments: [],
+        status: 'queue' as TaskStatus,
+        position: maxPosition + 1,
+        user_id: (await supabase.auth.getUser()).data.user!.id,
+      })
+      .select()
+      .single()
+
+    if (!error && newTask) {
+      setTasks((prev) => [...prev, newTask])
+    }
+    setModalOpen(false)
+  }
+
+  const handleUpdateTask = async (data: {
+    title: string
+    description?: string
+    deadline?: string
+    tags?: string[]
+    subtasks?: SubTask[]
+  }) => {
+    if (!editingTask) return
+
+    const supabase = createClient()
+    const { error } = await supabase
+      .from('tasks')
+      .update({
+        title: data.title,
+        description: data.description || null,
+        deadline: data.deadline || null,
+        tags: data.tags || [],
+        subtasks: data.subtasks || [],
+      })
+      .eq('id', editingTask.id)
+
+    if (!error) {
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === editingTask.id
+            ? {
+                ...t,
+                title: data.title,
+                description: data.description || null,
+                deadline: data.deadline || null,
+                tags: data.tags || [],
+                subtasks: data.subtasks || [],
+              }
+            : t
+        )
+      )
+    }
+    setEditingTask(null)
+    setModalOpen(false)
+  }
+
+  const handleDeleteTask = (taskId: string) => {
+    const task = tasks.find((t) => t.id === taskId)
+    if (task) {
+      setDeleteConfirm({ isOpen: true, task })
+    }
+  }
+
+  const confirmDeleteTask = async () => {
+    if (!deleteConfirm.task) return
+
+    const supabase = createClient()
+    const { error } = await supabase.from('tasks').delete().eq('id', deleteConfirm.task.id)
+    if (!error) {
+      setTasks((prev) => prev.filter((t) => t.id !== deleteConfirm.task!.id))
+    }
+    setDeleteConfirm({ isOpen: false, task: null })
+  }
+
+  const handleEditTask = (task: Task) => {
+    setEditingTask(task)
+    setModalOpen(true)
+  }
+
+  const handleToggleSubtask = async (taskId: string, subtaskId: string) => {
+    const task = tasks.find((t) => t.id === taskId)
+    if (!task) return
+
+    const subtasks = (task.subtasks || []) as SubTask[]
+    const updatedSubtasks = subtasks.map((st) =>
+      st.id === subtaskId ? { ...st, completed: !st.completed } : st
+    )
+
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId ? { ...t, subtasks: updatedSubtasks } : t
+      )
+    )
+
+    const supabase = createClient()
+    await supabase
+      .from('tasks')
+      .update({ subtasks: updatedSubtasks })
+      .eq('id', taskId)
+  }
+
+  const handleExport = (format: 'json' | 'csv') => {
+    const data = tasks.map(({ id, title, description, deadline, status, tags, subtasks, completed_at, created_at }) => ({
+      id,
+      title,
+      description: description || '',
+      deadline: deadline || '',
+      status,
+      tags: (tags || []).join(', '),
+      subtasks: (subtasks || []).map((st: SubTask) => `${st.completed ? '[x]' : '[ ]'} ${st.text}`).join('; '),
+      completed_at: completed_at || '',
+      created_at,
+    }))
+
+    let content: string
+    let filename: string
+    let type: string
+
+    if (format === 'json') {
+      content = JSON.stringify(data, null, 2)
+      filename = 'taskflow-export.json'
+      type = 'application/json'
+    } else {
+      const headers = ['id', 'title', 'description', 'deadline', 'status', 'tags', 'subtasks', 'completed_at', 'created_at']
+      const csvRows = [
+        headers.join(','),
+        ...data.map((row) =>
+          headers.map((h) => {
+            const value = row[h as keyof typeof row]
+            const escaped = String(value).replace(/"/g, '""')
+            return escaped.includes(',') || escaped.includes('"') || escaped.includes('\n')
+              ? `"${escaped}"`
+              : escaped
+          }).join(',')
+        ),
+      ]
+      content = csvRows.join('\n')
+      filename = 'taskflow-export.csv'
+      type = 'text/csv'
+    }
+
+    const blob = new Blob([content], { type })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  return (
+    <div className="min-h-screen" style={{ background: 'var(--bg-primary)' }}>
+      <Header
+        userEmail={userEmail}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        onExport={handleExport}
+        onNewTask={() => {
+          setEditingTask(null)
+          setModalOpen(true)
+        }}
+      />
+
+      <main className="px-6 py-6">
+        {isMounted ? (
+          <DndContext
+            collisionDetection={pointerWithin}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDragEnd={handleDragEnd}
+          >
+            <div className="flex gap-6 overflow-x-auto pb-4">
+              {COLUMNS.map((column) => (
+                <Column
+                  key={column.id}
+                  id={column.id}
+                  title={column.title}
+                  tasks={getTasksByStatus(column.id)}
+                  onEditTask={handleEditTask}
+                  onDeleteTask={handleDeleteTask}
+                  onToggleSubtask={handleToggleSubtask}
+                />
+              ))}
+            </div>
+
+            <DragOverlay>
+              {activeTask ? (
+                <TaskCard
+                  task={activeTask}
+                  onEdit={() => {}}
+                  onDelete={() => {}}
+                  onToggleSubtask={() => {}}
+                  isDragging
+                />
+              ) : null}
+            </DragOverlay>
+          </DndContext>
+        ) : (
+          <div className="flex gap-6 overflow-x-auto pb-4">
+            {COLUMNS.map((column) => (
+              <Column
+                key={column.id}
+                id={column.id}
+                title={column.title}
+                tasks={getTasksByStatus(column.id)}
+                onEditTask={handleEditTask}
+                onDeleteTask={handleDeleteTask}
+                onToggleSubtask={handleToggleSubtask}
+              />
+            ))}
+          </div>
+        )}
+      </main>
+
+      <TaskModal
+        isOpen={modalOpen}
+        onClose={() => {
+          setModalOpen(false)
+          setEditingTask(null)
+        }}
+        onSubmit={editingTask ? handleUpdateTask : handleCreateTask}
+        task={editingTask}
+      />
+
+      <ConfirmModal
+        isOpen={deleteConfirm.isOpen}
+        title="Delete Task"
+        message={`Are you sure you want to delete "${deleteConfirm.task?.title}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="danger"
+        onConfirm={confirmDeleteTask}
+        onCancel={() => setDeleteConfirm({ isOpen: false, task: null })}
+      />
+    </div>
+  )
+}
