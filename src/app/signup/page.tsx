@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
@@ -11,7 +10,7 @@ export default function SignupPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
+  const [success, setSuccess] = useState(false)
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -41,8 +40,72 @@ export default function SignupPage() {
       return
     }
 
-    router.push('/board')
-    router.refresh()
+    setSuccess(true)
+    setLoading(false)
+  }
+
+  if (success) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center p-4"
+        style={{ background: 'var(--bg-primary)' }}
+      >
+        <div className="w-full max-w-md text-center">
+          {/* Email Icon */}
+          <div
+            className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-6"
+            style={{ background: 'var(--tag-green)', color: 'var(--tag-green-text)' }}
+          >
+            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+          </div>
+
+          <h1
+            className="text-2xl font-semibold mb-3"
+            style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}
+          >
+            Check your email
+          </h1>
+
+          <p
+            className="text-sm mb-2"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            We sent a confirmation link to
+          </p>
+
+          <p
+            className="text-sm font-medium mb-6"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            {email}
+          </p>
+
+          <p
+            className="text-sm mb-8"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            Click the link in your email to activate your account and start using TaskFlow.
+          </p>
+
+          <Link
+            href="/login"
+            className="btn btn-primary inline-flex items-center gap-2 px-6 py-2.5"
+            style={{ background: 'var(--accent)' }}
+          >
+            Go to login
+          </Link>
+
+          <p
+            className="text-xs mt-6"
+            style={{ color: 'var(--text-tertiary)' }}
+          >
+            Didn&apos;t receive the email? Check your spam folder.
+          </p>
+        </div>
+      </div>
+    )
   }
 
   return (
