@@ -16,9 +16,10 @@ interface TaskModalProps {
   task?: Task | null
   viewOnly?: boolean
   onEdit?: () => void
+  onToggleSubtask?: (subtaskId: string) => void
 }
 
-export default function TaskModal({ isOpen, onClose, onSubmit, task, viewOnly = false, onEdit }: TaskModalProps) {
+export default function TaskModal({ isOpen, onClose, onSubmit, task, viewOnly = false, onEdit, onToggleSubtask }: TaskModalProps) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [deadline, setDeadline] = useState('')
@@ -335,24 +336,19 @@ export default function TaskModal({ isOpen, onClose, onSubmit, task, viewOnly = 
               subtasks.length > 0 ? (
                 <div className="space-y-2">
                   {subtasks.map((subtask) => (
-                    <div
+                    <label
                       key={subtask.id}
-                      className="flex items-center gap-2 p-2 rounded-lg"
+                      className="flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors"
                       style={{ background: 'var(--bg-secondary)' }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-hover)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'var(--bg-secondary)'}
                     >
-                      <div
-                        className="w-4 h-4 rounded border flex items-center justify-center"
-                        style={{
-                          borderColor: subtask.completed ? 'var(--accent)' : 'var(--border-medium)',
-                          background: subtask.completed ? 'var(--accent)' : 'transparent',
-                        }}
-                      >
-                        {subtask.completed && (
-                          <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                      </div>
+                      <input
+                        type="checkbox"
+                        checked={subtask.completed}
+                        onChange={() => onToggleSubtask?.(subtask.id)}
+                        className="checkbox-custom"
+                      />
                       <span
                         className={`flex-1 text-[13px] ${subtask.completed ? 'line-through' : ''}`}
                         style={{
@@ -361,7 +357,7 @@ export default function TaskModal({ isOpen, onClose, onSubmit, task, viewOnly = 
                       >
                         {subtask.text}
                       </span>
-                    </div>
+                    </label>
                   ))}
                 </div>
               ) : (
@@ -465,7 +461,11 @@ export default function TaskModal({ isOpen, onClose, onSubmit, task, viewOnly = 
               onEdit && (
                 <button
                   type="button"
-                  onClick={onEdit}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    onEdit()
+                  }}
                   className="btn btn-primary"
                   style={{ background: 'var(--accent)' }}
                 >

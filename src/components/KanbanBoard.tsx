@@ -270,6 +270,34 @@ export default function KanbanBoard({ initialTasks, userEmail }: KanbanBoardProp
     }
   }
 
+  const handleViewToggleSubtask = async (subtaskId: string) => {
+    if (!viewingTask) return
+
+    const subtasks = (viewingTask.subtasks || []) as SubTask[]
+    const updatedSubtasks = subtasks.map((st) =>
+      st.id === subtaskId ? { ...st, completed: !st.completed } : st
+    )
+
+    const updatedTask = { ...viewingTask, subtasks: updatedSubtasks }
+
+    // Update viewingTask state for immediate UI feedback
+    setViewingTask(updatedTask)
+
+    // Update tasks state
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === viewingTask.id ? { ...t, subtasks: updatedSubtasks } : t
+      )
+    )
+
+    // Save to database
+    const supabase = createClient()
+    await supabase
+      .from('tasks')
+      .update({ subtasks: updatedSubtasks })
+      .eq('id', viewingTask.id)
+  }
+
   const handleToggleSubtask = async (taskId: string, subtaskId: string) => {
     const task = tasks.find((t) => t.id === taskId)
     if (!task) return
@@ -420,6 +448,7 @@ export default function KanbanBoard({ initialTasks, userEmail }: KanbanBoardProp
         task={viewingTask || editingTask}
         viewOnly={!!viewingTask}
         onEdit={handleSwitchToEdit}
+        onToggleSubtask={handleViewToggleSubtask}
       />
 
       <ConfirmModal
