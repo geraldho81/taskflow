@@ -6,6 +6,7 @@ import { Task, SubTask, getTagInfo, isPresetTag } from '@/types/database'
 
 interface TaskCardProps {
   task: Task
+  onView: () => void
   onEdit: () => void
   onDelete: () => void
   onToggleSubtask: (subtaskId: string) => void
@@ -35,6 +36,7 @@ function formatDate(dateString: string): string {
 
 export default function TaskCard({
   task,
+  onView,
   onEdit,
   onDelete,
   onToggleSubtask,
@@ -63,9 +65,10 @@ export default function TaskCard({
     <div
       ref={setNodeRef}
       style={style}
-      className={`card p-4 group ${
+      className={`card p-4 group cursor-pointer ${
         isDragging || isSortableDragging ? 'opacity-60 rotate-2 scale-105' : ''
       }`}
+      onClick={onView}
     >
       {/* Header with drag handle, title and actions */}
       <div className="flex items-start gap-2">

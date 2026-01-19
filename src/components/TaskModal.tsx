@@ -14,9 +14,11 @@ interface TaskModalProps {
     subtasks?: SubTask[]
   }) => void
   task?: Task | null
+  viewOnly?: boolean
+  onEdit?: () => void
 }
 
-export default function TaskModal({ isOpen, onClose, onSubmit, task }: TaskModalProps) {
+export default function TaskModal({ isOpen, onClose, onSubmit, task, viewOnly = false, onEdit }: TaskModalProps) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [deadline, setDeadline] = useState('')
@@ -123,7 +125,7 @@ export default function TaskModal({ isOpen, onClose, onSubmit, task }: TaskModal
               color: 'var(--text-primary)',
             }}
           >
-            {task ? 'Edit Task' : 'New Task'}
+            {viewOnly ? 'Task Details' : task ? 'Edit Task' : 'New Task'}
           </h2>
           <button
             onClick={onClose}
@@ -145,17 +147,23 @@ export default function TaskModal({ isOpen, onClose, onSubmit, task }: TaskModal
               className="block text-[13px] font-medium mb-1.5"
               style={{ color: 'var(--text-secondary)' }}
             >
-              Title <span style={{ color: 'var(--tag-orange-text)' }}>*</span>
+              Title {!viewOnly && <span style={{ color: 'var(--tag-orange-text)' }}>*</span>}
             </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="input"
-              placeholder="Enter task title"
-              required
-              autoFocus
-            />
+            {viewOnly ? (
+              <p className="text-[15px] font-medium" style={{ color: 'var(--text-primary)' }}>
+                {title}
+              </p>
+            ) : (
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="input"
+                placeholder="Enter task title"
+                required
+                autoFocus
+              />
+            )}
           </div>
 
           {/* Description */}
@@ -166,13 +174,19 @@ export default function TaskModal({ isOpen, onClose, onSubmit, task }: TaskModal
             >
               Description
             </label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="input resize-none"
-              placeholder="Add a description..."
-              rows={3}
-            />
+            {viewOnly ? (
+              <p className="text-[14px]" style={{ color: description ? 'var(--text-primary)' : 'var(--text-tertiary)' }}>
+                {description || 'No description'}
+              </p>
+            ) : (
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="input resize-none"
+                placeholder="Add a description..."
+                rows={3}
+              />
+            )}
           </div>
 
           {/* Deadline */}
@@ -183,12 +197,18 @@ export default function TaskModal({ isOpen, onClose, onSubmit, task }: TaskModal
             >
               Deadline
             </label>
-            <input
-              type="date"
-              value={deadline}
-              onChange={(e) => setDeadline(e.target.value)}
-              className="input"
-            />
+            {viewOnly ? (
+              <p className="text-[14px]" style={{ color: deadline ? 'var(--text-primary)' : 'var(--text-tertiary)' }}>
+                {deadline ? new Date(deadline).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'No deadline set'}
+              </p>
+            ) : (
+              <input
+                type="date"
+                value={deadline}
+                onChange={(e) => setDeadline(e.target.value)}
+                className="input"
+              />
+            )}
           </div>
 
           {/* Tags */}
@@ -200,83 +220,106 @@ export default function TaskModal({ isOpen, onClose, onSubmit, task }: TaskModal
               Tags
             </label>
 
-            {/* Preset tags */}
-            <div className="flex flex-wrap gap-2 mb-3">
-              {PRESET_TAGS.map((tag) => {
-                const config = TAG_CONFIG[tag]
-                const isSelected = tags.includes(tag)
-                return (
+            {viewOnly ? (
+              tags.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {tags.map((tag) => {
+                    const tagInfo = getTagInfo(tag)
+                    return (
+                      <span
+                        key={tag}
+                        className={`tag ${tagInfo.className || ''}`}
+                        style={!tagInfo.className ? { background: tagInfo.bg, color: tagInfo.text } : undefined}
+                      >
+                        {tagInfo.label}
+                      </span>
+                    )
+                  })}
+                </div>
+              ) : (
+                <p className="text-[14px]" style={{ color: 'var(--text-tertiary)' }}>No tags</p>
+              )
+            ) : (
+              <>
+                {/* Preset tags */}
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {PRESET_TAGS.map((tag) => {
+                    const config = TAG_CONFIG[tag]
+                    const isSelected = tags.includes(tag)
+                    return (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => toggleTag(tag)}
+                        className={`tag transition-all ${config.className}`}
+                        style={{
+                          opacity: isSelected ? 1 : 0.5,
+                          transform: isSelected ? 'scale(1.05)' : 'scale(1)',
+                          border: isSelected ? '1px solid currentColor' : '1px solid transparent',
+                        }}
+                      >
+                        {config.label}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Custom tags */}
+                {customTags.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {customTags.map((tag) => {
+                      const tagInfo = getTagInfo(tag)
+                      return (
+                        <span
+                          key={tag}
+                          className="tag inline-flex items-center gap-1"
+                          style={{ background: tagInfo.bg, color: tagInfo.text }}
+                        >
+                          {tagInfo.label}
+                          <button
+                            type="button"
+                            onClick={() => removeTag(tag)}
+                            className="ml-0.5 hover:opacity-70 transition-opacity"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </span>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {/* Add custom tag input */}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newTag}
+                    onChange={(e) => setNewTag(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        addCustomTag()
+                      }
+                    }}
+                    className="input flex-1"
+                    placeholder="Add a custom tag..."
+                  />
                   <button
-                    key={tag}
                     type="button"
-                    onClick={() => toggleTag(tag)}
-                    className={`tag transition-all ${config.className}`}
+                    onClick={addCustomTag}
+                    className="btn btn-secondary"
                     style={{
-                      opacity: isSelected ? 1 : 0.5,
-                      transform: isSelected ? 'scale(1.05)' : 'scale(1)',
-                      border: isSelected ? '1px solid currentColor' : '1px solid transparent',
+                      background: 'var(--bg-secondary)',
+                      border: '1px solid var(--border-light)',
                     }}
                   >
-                    {config.label}
+                    Add
                   </button>
-                )
-              })}
-            </div>
-
-            {/* Custom tags */}
-            {customTags.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-3">
-                {customTags.map((tag) => {
-                  const tagInfo = getTagInfo(tag)
-                  return (
-                    <span
-                      key={tag}
-                      className="tag inline-flex items-center gap-1"
-                      style={{ background: tagInfo.bg, color: tagInfo.text }}
-                    >
-                      {tagInfo.label}
-                      <button
-                        type="button"
-                        onClick={() => removeTag(tag)}
-                        className="ml-0.5 hover:opacity-70 transition-opacity"
-                      >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </span>
-                  )
-                })}
-              </div>
+                </div>
+              </>
             )}
-
-            {/* Add custom tag input */}
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newTag}
-                onChange={(e) => setNewTag(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    addCustomTag()
-                  }
-                }}
-                className="input flex-1"
-                placeholder="Add a custom tag..."
-              />
-              <button
-                type="button"
-                onClick={addCustomTag}
-                className="btn btn-secondary"
-                style={{
-                  background: 'var(--bg-secondary)',
-                  border: '1px solid var(--border-light)',
-                }}
-              >
-                Add
-              </button>
-            </div>
           </div>
 
           {/* Subtasks */}
@@ -288,77 +331,117 @@ export default function TaskModal({ isOpen, onClose, onSubmit, task }: TaskModal
               Sub tasks
             </label>
 
-            {/* Existing subtasks */}
-            {subtasks.length > 0 && (
-              <div className="space-y-2 mb-3">
-                {subtasks.map((subtask) => (
-                  <div
-                    key={subtask.id}
-                    className="flex items-center gap-2 p-2 rounded-lg"
-                    style={{ background: 'var(--bg-secondary)' }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={subtask.completed}
-                      onChange={() => toggleSubtask(subtask.id)}
-                      className="checkbox-custom"
-                    />
-                    <span
-                      className={`flex-1 text-[13px] ${
-                        subtask.completed ? 'line-through' : ''
-                      }`}
-                      style={{
-                        color: subtask.completed
-                          ? 'var(--text-tertiary)'
-                          : 'var(--text-primary)',
-                      }}
+            {viewOnly ? (
+              subtasks.length > 0 ? (
+                <div className="space-y-2">
+                  {subtasks.map((subtask) => (
+                    <div
+                      key={subtask.id}
+                      className="flex items-center gap-2 p-2 rounded-lg"
+                      style={{ background: 'var(--bg-secondary)' }}
                     >
-                      {subtask.text}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => removeSubtask(subtask.id)}
-                      className="p-1 rounded transition-colors"
-                      style={{ color: 'var(--text-tertiary)' }}
-                      onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--tag-orange-text)')}
-                      onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-tertiary)')}
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
+                      <div
+                        className="w-4 h-4 rounded border flex items-center justify-center"
+                        style={{
+                          borderColor: subtask.completed ? 'var(--accent)' : 'var(--border-medium)',
+                          background: subtask.completed ? 'var(--accent)' : 'transparent',
+                        }}
+                      >
+                        {subtask.completed && (
+                          <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+                      <span
+                        className={`flex-1 text-[13px] ${subtask.completed ? 'line-through' : ''}`}
+                        style={{
+                          color: subtask.completed ? 'var(--text-tertiary)' : 'var(--text-primary)',
+                        }}
+                      >
+                        {subtask.text}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[14px]" style={{ color: 'var(--text-tertiary)' }}>No subtasks</p>
+              )
+            ) : (
+              <>
+                {/* Existing subtasks */}
+                {subtasks.length > 0 && (
+                  <div className="space-y-2 mb-3">
+                    {subtasks.map((subtask) => (
+                      <div
+                        key={subtask.id}
+                        className="flex items-center gap-2 p-2 rounded-lg"
+                        style={{ background: 'var(--bg-secondary)' }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={subtask.completed}
+                          onChange={() => toggleSubtask(subtask.id)}
+                          className="checkbox-custom"
+                        />
+                        <span
+                          className={`flex-1 text-[13px] ${
+                            subtask.completed ? 'line-through' : ''
+                          }`}
+                          style={{
+                            color: subtask.completed
+                              ? 'var(--text-tertiary)'
+                              : 'var(--text-primary)',
+                          }}
+                        >
+                          {subtask.text}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => removeSubtask(subtask.id)}
+                          className="p-1 rounded transition-colors"
+                          style={{ color: 'var(--text-tertiary)' }}
+                          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--tag-orange-text)')}
+                          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-tertiary)')}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
+                )}
 
-            {/* Add subtask input */}
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newSubtask}
-                onChange={(e) => setNewSubtask(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    addSubtask()
-                  }
-                }}
-                className="input flex-1"
-                placeholder="Add a subtask..."
-              />
-              <button
-                type="button"
-                onClick={addSubtask}
-                className="btn btn-secondary"
-                style={{
-                  background: 'var(--bg-secondary)',
-                  border: '1px solid var(--border-light)',
-                }}
-              >
-                Add
-              </button>
-            </div>
+                {/* Add subtask input */}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newSubtask}
+                    onChange={(e) => setNewSubtask(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        addSubtask()
+                      }
+                    }}
+                    className="input flex-1"
+                    placeholder="Add a subtask..."
+                  />
+                  <button
+                    type="button"
+                    onClick={addSubtask}
+                    className="btn btn-secondary"
+                    style={{
+                      background: 'var(--bg-secondary)',
+                      border: '1px solid var(--border-light)',
+                    }}
+                  >
+                    Add
+                  </button>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Actions */}
@@ -376,15 +459,28 @@ export default function TaskModal({ isOpen, onClose, onSubmit, task }: TaskModal
                 color: 'var(--text-secondary)',
               }}
             >
-              Cancel
+              {viewOnly ? 'Close' : 'Cancel'}
             </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              style={{ background: 'var(--accent)' }}
-            >
-              {task ? 'Save Changes' : 'Create Task'}
-            </button>
+            {viewOnly ? (
+              onEdit && (
+                <button
+                  type="button"
+                  onClick={onEdit}
+                  className="btn btn-primary"
+                  style={{ background: 'var(--accent)' }}
+                >
+                  Edit Task
+                </button>
+              )
+            ) : (
+              <button
+                type="submit"
+                className="btn btn-primary"
+                style={{ background: 'var(--accent)' }}
+              >
+                {task ? 'Save Changes' : 'Create Task'}
+              </button>
+            )}
           </div>
         </form>
       </div>

@@ -27,6 +27,7 @@ export default function KanbanBoard({ initialTasks, userEmail }: KanbanBoardProp
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const [viewingTask, setViewingTask] = useState<Task | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; task: Task | null }>({
     isOpen: false,
     task: null,
@@ -251,9 +252,22 @@ export default function KanbanBoard({ initialTasks, userEmail }: KanbanBoardProp
     setDeleteConfirm({ isOpen: false, task: null })
   }
 
+  const handleViewTask = (task: Task) => {
+    setViewingTask(task)
+    setModalOpen(true)
+  }
+
   const handleEditTask = (task: Task) => {
     setEditingTask(task)
+    setViewingTask(null)
     setModalOpen(true)
+  }
+
+  const handleSwitchToEdit = () => {
+    if (viewingTask) {
+      setEditingTask(viewingTask)
+      setViewingTask(null)
+    }
   }
 
   const handleToggleSubtask = async (taskId: string, subtaskId: string) => {
@@ -336,6 +350,7 @@ export default function KanbanBoard({ initialTasks, userEmail }: KanbanBoardProp
         onExport={handleExport}
         onNewTask={() => {
           setEditingTask(null)
+          setViewingTask(null)
           setModalOpen(true)
         }}
       />
@@ -355,6 +370,7 @@ export default function KanbanBoard({ initialTasks, userEmail }: KanbanBoardProp
                   id={column.id}
                   title={column.title}
                   tasks={getTasksByStatus(column.id)}
+                  onViewTask={handleViewTask}
                   onEditTask={handleEditTask}
                   onDeleteTask={handleDeleteTask}
                   onToggleSubtask={handleToggleSubtask}
@@ -366,6 +382,7 @@ export default function KanbanBoard({ initialTasks, userEmail }: KanbanBoardProp
               {activeTask ? (
                 <TaskCard
                   task={activeTask}
+                  onView={() => {}}
                   onEdit={() => {}}
                   onDelete={() => {}}
                   onToggleSubtask={() => {}}
@@ -382,6 +399,7 @@ export default function KanbanBoard({ initialTasks, userEmail }: KanbanBoardProp
                 id={column.id}
                 title={column.title}
                 tasks={getTasksByStatus(column.id)}
+                onViewTask={handleViewTask}
                 onEditTask={handleEditTask}
                 onDeleteTask={handleDeleteTask}
                 onToggleSubtask={handleToggleSubtask}
@@ -396,9 +414,12 @@ export default function KanbanBoard({ initialTasks, userEmail }: KanbanBoardProp
         onClose={() => {
           setModalOpen(false)
           setEditingTask(null)
+          setViewingTask(null)
         }}
         onSubmit={editingTask ? handleUpdateTask : handleCreateTask}
-        task={editingTask}
+        task={viewingTask || editingTask}
+        viewOnly={!!viewingTask}
+        onEdit={handleSwitchToEdit}
       />
 
       <ConfirmModal

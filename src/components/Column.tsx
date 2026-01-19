@@ -9,6 +9,7 @@ interface ColumnProps {
   id: TaskStatus
   title: string
   tasks: Task[]
+  onViewTask: (task: Task) => void
   onEditTask: (task: Task) => void
   onDeleteTask: (taskId: string) => void
   onToggleSubtask: (taskId: string, subtaskId: string) => void
@@ -24,6 +25,7 @@ export default function Column({
   id,
   title,
   tasks,
+  onViewTask,
   onEditTask,
   onDeleteTask,
   onToggleSubtask,
@@ -36,11 +38,12 @@ export default function Column({
       ref={setNodeRef}
       className="flex-1 min-w-[320px] max-w-[400px] flex flex-col"
       style={{
-        minHeight: 'calc(100vh - 140px)'
+        height: 'calc(100vh - 140px)',
+        maxHeight: 'calc(100vh - 140px)'
       }}
     >
       {/* Column Header */}
-      <div className="flex items-center gap-2 mb-4 px-1">
+      <div className="flex items-center gap-2 mb-4 px-1 flex-shrink-0">
         <h2
           className="text-xs font-semibold tracking-wide"
           style={{
@@ -63,7 +66,7 @@ export default function Column({
 
       {/* Drop Zone */}
       <div
-        className="flex-1 rounded-lg p-2 transition-all duration-200"
+        className="flex-1 rounded-lg p-2 transition-all duration-200 overflow-y-auto"
         style={{
           background: isOver ? 'var(--bg-hover)' : 'transparent',
           border: isOver ? '2px dashed var(--border-medium)' : '2px dashed transparent'
@@ -79,6 +82,7 @@ export default function Column({
               >
                 <TaskCard
                   task={task}
+                  onView={() => onViewTask(task)}
                   onEdit={() => onEditTask(task)}
                   onDelete={() => onDeleteTask(task.id)}
                   onToggleSubtask={(subtaskId) => onToggleSubtask(task.id, subtaskId)}
