@@ -46,6 +46,20 @@ export default function TaskModal({ isOpen, onClose, onSubmit, task, viewOnly = 
     setNewTag('')
   }, [task, isOpen])
 
+  // Handle ESC key to close modal
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, onClose])
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!title.trim()) return
@@ -107,16 +121,17 @@ export default function TaskModal({ isOpen, onClose, onSubmit, task, viewOnly = 
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg rounded-xl animate-fadeIn"
+        className="w-full max-w-lg rounded-xl animate-fadeIn flex flex-col"
         style={{
           background: 'var(--bg-card)',
           boxShadow: 'var(--shadow-lg)',
+          maxHeight: 'calc(100vh - 2rem)',
         }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div
-          className="flex items-center justify-between px-6 py-4 border-b"
+          className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0"
           style={{ borderColor: 'var(--border-light)' }}
         >
           <h2
@@ -141,7 +156,9 @@ export default function TaskModal({ isOpen, onClose, onSubmit, task, viewOnly = 
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden min-h-0">
+          {/* Scrollable content */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-5">
           {/* Title */}
           <div>
             <label
@@ -440,9 +457,10 @@ export default function TaskModal({ isOpen, onClose, onSubmit, task, viewOnly = 
             )}
           </div>
 
-          {/* Actions */}
+          </div>
+          {/* Actions - fixed at bottom */}
           <div
-            className="flex justify-end gap-3 pt-4 border-t"
+            className="flex justify-end gap-3 px-6 py-4 border-t flex-shrink-0"
             style={{ borderColor: 'var(--border-light)' }}
           >
             <button
