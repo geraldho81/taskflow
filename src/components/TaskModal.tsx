@@ -1,7 +1,86 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { DndContext, DragEndEvent, closestCenter } from '@dnd-kit/core'
+import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { Task, SubTask, TAG_CONFIG, PRESET_TAGS, PresetTagType, getTagInfo } from '@/types/database'
+
+// Sortable subtask item component
+function SortableSubtaskItem({
+  subtask,
+  onToggle,
+  onRemove,
+}: {
+  subtask: SubTask
+  onToggle: () => void
+  onRemove: () => void
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: subtask.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-2 p-2 rounded-lg"
+      {...attributes}
+    >
+      <div
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing p-1 -ml-1 rounded hover:bg-[var(--bg-hover)]"
+        style={{ color: 'var(--text-tertiary)' }}
+      >
+        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+          <circle cx="9" cy="6" r="1.5" />
+          <circle cx="15" cy="6" r="1.5" />
+          <circle cx="9" cy="12" r="1.5" />
+          <circle cx="15" cy="12" r="1.5" />
+          <circle cx="9" cy="18" r="1.5" />
+          <circle cx="15" cy="18" r="1.5" />
+        </svg>
+      </div>
+      <input
+        type="checkbox"
+        checked={subtask.completed}
+        onChange={onToggle}
+        className="checkbox-custom"
+      />
+      <span
+        className={`flex-1 text-[13px] ${subtask.completed ? 'line-through' : ''}`}
+        style={{
+          color: subtask.completed ? 'var(--text-tertiary)' : 'var(--text-primary)',
+        }}
+      >
+        {subtask.text}
+      </span>
+      <button
+        type="button"
+        onClick={onRemove}
+        className="p-1 rounded transition-colors"
+        style={{ color: 'var(--text-tertiary)' }}
+        onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--tag-orange-text)')}
+        onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-tertiary)')}
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+  )
+}
 
 interface TaskModalProps {
   isOpen: boolean
@@ -110,6 +189,17 @@ export default function TaskModal({ isOpen, onClose, onSubmit, task, viewOnly = 
     setSubtasks((prev) =>
       prev.map((st) => (st.id === id ? { ...st, completed: !st.completed } : st))
     )
+  }
+
+  const handleSubtaskDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    setSubtasks((prev) => {
+      const oldIndex = prev.findIndex((st) => st.id === active.id)
+      const newIndex = prev.findIndex((st) => st.id === over.id)
+      return arrayMove(prev, oldIndex, newIndex)
+    })
   }
 
   if (!isOpen) return null
@@ -382,48 +472,29 @@ export default function TaskModal({ isOpen, onClose, onSubmit, task, viewOnly = 
               )
             ) : (
               <>
-                {/* Existing subtasks */}
+                {/* Existing subtasks with drag and drop */}
                 {subtasks.length > 0 && (
-                  <div className="space-y-2 mb-3">
-                    {subtasks.map((subtask) => (
-                      <div
-                        key={subtask.id}
-                        className="flex items-center gap-2 p-2 rounded-lg"
-                        style={{ background: 'var(--bg-secondary)' }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={subtask.completed}
-                          onChange={() => toggleSubtask(subtask.id)}
-                          className="checkbox-custom"
-                        />
-                        <span
-                          className={`flex-1 text-[13px] ${
-                            subtask.completed ? 'line-through' : ''
-                          }`}
-                          style={{
-                            color: subtask.completed
-                              ? 'var(--text-tertiary)'
-                              : 'var(--text-primary)',
-                          }}
-                        >
-                          {subtask.text}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => removeSubtask(subtask.id)}
-                          className="p-1 rounded transition-colors"
-                          style={{ color: 'var(--text-tertiary)' }}
-                          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--tag-orange-text)')}
-                          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-tertiary)')}
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
+                  <DndContext
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleSubtaskDragEnd}
+                  >
+                    <SortableContext
+                      items={subtasks.map((st) => st.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      <div className="space-y-2 mb-3">
+                        {subtasks.map((subtask) => (
+                          <div key={subtask.id} style={{ background: 'var(--bg-secondary)', borderRadius: '0.5rem' }}>
+                            <SortableSubtaskItem
+                              subtask={subtask}
+                              onToggle={() => toggleSubtask(subtask.id)}
+                              onRemove={() => removeSubtask(subtask.id)}
+                            />
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    </SortableContext>
+                  </DndContext>
                 )}
 
                 {/* Add subtask input */}

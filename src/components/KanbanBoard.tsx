@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, DragOverlay, pointerWithin } from '@dnd-kit/core'
+import { arrayMove } from '@dnd-kit/sortable'
 import { Task, TaskStatus, SubTask, getTagInfo } from '@/types/database'
 import { createClient } from '@/lib/supabase/client'
 import Column from './Column'
@@ -110,52 +111,130 @@ export default function KanbanBoard({ initialTasks, userEmail }: KanbanBoardProp
     const activeId = active.id as string
     const overId = over.id as string
 
+    if (activeId === overId) return
+
     const activeTask = tasks.find((t) => t.id === activeId)
     if (!activeTask) return
 
+    // Determine target status
     let targetStatus: TaskStatus = activeTask.status
     const overColumn = COLUMNS.find((c) => c.id === overId)
+    const overTask = tasks.find((t) => t.id === overId)
+
     if (overColumn) {
       targetStatus = overColumn.id
-    } else {
-      const overTask = tasks.find((t) => t.id === overId)
-      if (overTask) {
-        targetStatus = overTask.status
-      }
+    } else if (overTask) {
+      targetStatus = overTask.status
     }
-
-    const tasksInColumn = tasks
-      .filter((t) => t.status === targetStatus && t.id !== activeId)
-      .sort((a, b) => a.position - b.position)
-
-    let newPosition: number
-    if (overColumn) {
-      newPosition = tasksInColumn.length > 0
-        ? Math.max(...tasksInColumn.map((t) => t.position)) + 1
-        : 0
-    } else {
-      const overTask = tasks.find((t) => t.id === overId)
-      if (overTask) {
-        const overIndex = tasksInColumn.findIndex((t) => t.id === overId)
-        newPosition = overIndex >= 0 ? overIndex : tasksInColumn.length
-      } else {
-        newPosition = tasksInColumn.length
-      }
-    }
-
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.id === activeId
-          ? { ...t, status: targetStatus, position: newPosition }
-          : t
-      )
-    )
 
     const supabase = createClient()
-    await supabase
-      .from('tasks')
-      .update({ status: targetStatus, position: newPosition })
-      .eq('id', activeId)
+
+    // Get tasks in target column (sorted by position)
+    const tasksInTargetColumn = tasks
+      .filter((t) => t.status === targetStatus)
+      .sort((a, b) => a.position - b.position)
+
+    // Same column reordering
+    if (activeTask.status === targetStatus) {
+      const oldIndex = tasksInTargetColumn.findIndex((t) => t.id === activeId)
+      const newIndex = overTask
+        ? tasksInTargetColumn.findIndex((t) => t.id === overId)
+        : tasksInTargetColumn.length - 1
+
+      if (oldIndex !== newIndex && newIndex !== -1) {
+        const reorderedTasks = arrayMove(tasksInTargetColumn, oldIndex, newIndex)
+
+        // Update positions for all tasks in the column
+        const updatedTasks = reorderedTasks.map((t, index) => ({
+          ...t,
+          position: index,
+        }))
+
+        setTasks((prev) =>
+          prev.map((t) => {
+            const updated = updatedTasks.find((ut) => ut.id === t.id)
+            return updated || t
+          })
+        )
+
+        // Batch update positions in database
+        for (const t of updatedTasks) {
+          await supabase
+            .from('tasks')
+            .update({ position: t.position })
+            .eq('id', t.id)
+        }
+      }
+    } else {
+      // Moving to different column
+      // Remove from old column and add to new column
+      const tasksInOldColumn = tasks
+        .filter((t) => t.status === activeTask.status && t.id !== activeId)
+        .sort((a, b) => a.position - b.position)
+
+      // Calculate new position in target column
+      let newPosition: number
+      if (overColumn) {
+        // Dropped on column itself - add to end
+        newPosition = tasksInTargetColumn.length
+      } else if (overTask) {
+        // Dropped on a task - insert at that position
+        const overIndex = tasksInTargetColumn.findIndex((t) => t.id === overId)
+        newPosition = overIndex >= 0 ? overIndex : tasksInTargetColumn.length
+      } else {
+        newPosition = tasksInTargetColumn.length
+      }
+
+      // Update positions in old column
+      const updatedOldColumn = tasksInOldColumn.map((t, index) => ({
+        ...t,
+        position: index,
+      }))
+
+      // Insert into new column and update positions
+      const newColumnTasks = [
+        ...tasksInTargetColumn.slice(0, newPosition),
+        { ...activeTask, status: targetStatus, position: newPosition },
+        ...tasksInTargetColumn.slice(newPosition),
+      ].map((t, index) => ({ ...t, position: index }))
+
+      setTasks((prev) =>
+        prev.map((t) => {
+          if (t.id === activeId) {
+            return { ...t, status: targetStatus, position: newPosition }
+          }
+          const updatedOld = updatedOldColumn.find((ut) => ut.id === t.id)
+          if (updatedOld) return updatedOld
+          const updatedNew = newColumnTasks.find((ut) => ut.id === t.id)
+          if (updatedNew) return updatedNew
+          return t
+        })
+      )
+
+      // Update database
+      await supabase
+        .from('tasks')
+        .update({ status: targetStatus, position: newPosition })
+        .eq('id', activeId)
+
+      // Update positions for remaining tasks in old column
+      for (const t of updatedOldColumn) {
+        await supabase
+          .from('tasks')
+          .update({ position: t.position })
+          .eq('id', t.id)
+      }
+
+      // Update positions for tasks in new column
+      for (const t of newColumnTasks) {
+        if (t.id !== activeId) {
+          await supabase
+            .from('tasks')
+            .update({ position: t.position })
+            .eq('id', t.id)
+        }
+      }
+    }
   }
 
   const handleCreateTask = async (data: {
