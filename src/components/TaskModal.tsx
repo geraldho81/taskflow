@@ -139,9 +139,10 @@ interface TaskModalProps {
   viewOnly?: boolean
   onEdit?: () => void
   onToggleSubtask?: (subtaskId: string) => void
+  existingTags?: string[]
 }
 
-export default function TaskModal({ isOpen, onClose, onSubmit, task, viewOnly = false, onEdit, onToggleSubtask }: TaskModalProps) {
+export default function TaskModal({ isOpen, onClose, onSubmit, task, viewOnly = false, onEdit, onToggleSubtask, existingTags = [] }: TaskModalProps) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [deadline, setDeadline] = useState('')
@@ -202,7 +203,7 @@ export default function TaskModal({ isOpen, onClose, onSubmit, task, viewOnly = 
   }
 
   const addCustomTag = () => {
-    const tagValue = newTag.trim().toLowerCase().replace(/\s+/g, '-')
+    const tagValue = newTag.trim()
     if (!tagValue || tags.includes(tagValue)) return
     setTags((prev) => [...prev, tagValue])
     setNewTag('')
@@ -447,6 +448,43 @@ export default function TaskModal({ isOpen, onClose, onSubmit, task, viewOnly = 
                     })}
                   </div>
                 )}
+
+                {/* Previously used tags (suggestions) */}
+                {(() => {
+                  const unusedExistingTags = existingTags.filter(
+                    (tag) => !tags.includes(tag) && !PRESET_TAGS.includes(tag as PresetTagType)
+                  )
+                  if (unusedExistingTags.length === 0) return null
+                  return (
+                    <div className="mb-3">
+                      <span className="text-[11px] font-medium mb-1.5 block" style={{ color: 'var(--text-tertiary)' }}>
+                        Previously used
+                      </span>
+                      <div className="flex flex-wrap gap-2">
+                        {unusedExistingTags.map((tag) => {
+                          const tagInfo = getTagInfo(tag)
+                          return (
+                            <button
+                              key={tag}
+                              type="button"
+                              onClick={() => toggleTag(tag)}
+                              className="tag transition-all"
+                              style={{
+                                background: tagInfo.bg,
+                                color: tagInfo.text,
+                                opacity: 0.7,
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                              onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.7')}
+                            >
+                              {tagInfo.label}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })()}
 
                 {/* Add custom tag input */}
                 <div className="flex gap-2">

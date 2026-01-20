@@ -121,9 +121,6 @@ export function getTagInfo(tag: string): { label: string; bg: string; text: stri
     return { label: config.label, bg: '', text: '', className: config.className }
   }
   const colors = getCustomTagColor(tag)
-  // Capitalize first letter of each word for display
-  const label = tag.split('-').map(word =>
-    word.charAt(0).toUpperCase() + word.slice(1)
-  ).join(' ')
-  return { label, bg: colors.bg, text: colors.text }
+  // Use tag as-is, preserving user's original capitalization
+  return { label: tag, bg: colors.bg, text: colors.text }
 }

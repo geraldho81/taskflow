@@ -62,6 +62,17 @@ export default function KanbanBoard({ initialTasks, userEmail }: KanbanBoardProp
     })
   }, [tasks, searchQuery])
 
+  // Collect all unique tags from all tasks for suggestions
+  const allExistingTags = useMemo(() => {
+    const tagSet = new Set<string>()
+    tasks.forEach((task) => {
+      if (task.tags) {
+        task.tags.forEach((tag) => tagSet.add(tag))
+      }
+    })
+    return Array.from(tagSet).sort()
+  }, [tasks])
+
   const getTasksByStatus = (status: TaskStatus) => {
     return filteredTasks
       .filter((task) => task.status === status)
@@ -574,6 +585,7 @@ export default function KanbanBoard({ initialTasks, userEmail }: KanbanBoardProp
         viewOnly={!!viewingTask}
         onEdit={handleSwitchToEdit}
         onToggleSubtask={handleViewToggleSubtask}
+        existingTags={allExistingTags}
       />
 
       <ConfirmModal
