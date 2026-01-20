@@ -34,6 +34,7 @@ export default function KanbanBoard({ initialTasks, userEmail }: KanbanBoardProp
     task: null,
   })
   const [isMounted, setIsMounted] = useState(false)
+  const [dragStartStatus, setDragStartStatus] = useState<TaskStatus | null>(null)
 
   // Prevent hydration mismatch from dnd-kit
   useEffect(() => {
@@ -69,7 +70,10 @@ export default function KanbanBoard({ initialTasks, userEmail }: KanbanBoardProp
 
   const handleDragStart = (event: DragStartEvent) => {
     const task = tasks.find((t) => t.id === event.active.id)
-    if (task) setActiveTask(task)
+    if (task) {
+      setActiveTask(task)
+      setDragStartStatus(task.status)
+    }
   }
 
   const handleDragOver = (event: DragOverEvent) => {
@@ -106,6 +110,10 @@ export default function KanbanBoard({ initialTasks, userEmail }: KanbanBoardProp
     const { active, over } = event
     setActiveTask(null)
 
+    // Capture the original status before clearing it
+    const originalStatus = dragStartStatus
+    setDragStartStatus(null)
+
     if (!over) return
 
     const activeId = active.id as string
@@ -114,13 +122,13 @@ export default function KanbanBoard({ initialTasks, userEmail }: KanbanBoardProp
     if (activeId === overId) return
 
     const activeTask = tasks.find((t) => t.id === activeId)
-    if (!activeTask) return
+    if (!activeTask || !originalStatus) return
 
     // Store original tasks state for rollback on error
     const originalTasks = [...tasks]
 
     // Determine target status
-    let targetStatus: TaskStatus = activeTask.status
+    let targetStatus: TaskStatus = originalStatus
     const overColumn = COLUMNS.find((c) => c.id === overId)
     const overTask = tasks.find((t) => t.id === overId)
 
@@ -132,20 +140,20 @@ export default function KanbanBoard({ initialTasks, userEmail }: KanbanBoardProp
 
     const supabase = createClient()
 
-    // Get tasks in target column (sorted by position)
-    const tasksInTargetColumn = tasks
-      .filter((t) => t.status === targetStatus)
-      .sort((a, b) => a.position - b.position)
+    // Same column reordering (use originalStatus to check, not activeTask.status which was modified by handleDragOver)
+    if (originalStatus === targetStatus) {
+      // For same column, include all tasks including active one
+      const tasksInColumn = tasks
+        .filter((t) => t.status === targetStatus)
+        .sort((a, b) => a.position - b.position)
 
-    // Same column reordering
-    if (activeTask.status === targetStatus) {
-      const oldIndex = tasksInTargetColumn.findIndex((t) => t.id === activeId)
+      const oldIndex = tasksInColumn.findIndex((t) => t.id === activeId)
       const newIndex = overTask
-        ? tasksInTargetColumn.findIndex((t) => t.id === overId)
-        : tasksInTargetColumn.length - 1
+        ? tasksInColumn.findIndex((t) => t.id === overId)
+        : tasksInColumn.length - 1
 
       if (oldIndex !== newIndex && newIndex !== -1) {
-        const reorderedTasks = arrayMove(tasksInTargetColumn, oldIndex, newIndex)
+        const reorderedTasks = arrayMove(tasksInColumn, oldIndex, newIndex)
 
         // Update positions for all tasks in the column
         const updatedTasks = reorderedTasks.map((t, index) => ({
@@ -180,9 +188,14 @@ export default function KanbanBoard({ initialTasks, userEmail }: KanbanBoardProp
       }
     } else {
       // Moving to different column
+      // Get tasks in target column (excluding the dragged task)
+      const tasksInTargetColumn = tasks
+        .filter((t) => t.status === targetStatus && t.id !== activeId)
+        .sort((a, b) => a.position - b.position)
+
       // Remove from old column and add to new column
       const tasksInOldColumn = tasks
-        .filter((t) => t.status === activeTask.status && t.id !== activeId)
+        .filter((t) => t.status === originalStatus && t.id !== activeId)
         .sort((a, b) => a.position - b.position)
 
       // Calculate new position in target column
