@@ -114,30 +114,19 @@ export default function KanbanBoard({ initialTasks, userEmail }: KanbanBoardProp
     const originalStatus = dragStartStatus
     setDragStartStatus(null)
 
-    console.log('handleDragEnd called', { originalStatus, over: over?.id })
-
-    if (!over) {
-      console.log('No over target, returning')
-      return
-    }
+    if (!over) return
 
     const activeId = active.id as string
     const overId = over.id as string
 
     const activeTask = tasks.find((t) => t.id === activeId)
-    if (!activeTask || !originalStatus) {
-      console.log('No activeTask or originalStatus', { activeTask: !!activeTask, originalStatus })
-      return
-    }
+    if (!activeTask || !originalStatus) return
 
     // Get the current status (which may have been updated by handleDragOver)
     const currentStatus = activeTask.status
 
     // If dropping on itself AND status hasn't changed, nothing to do
-    if (activeId === overId && originalStatus === currentStatus) {
-      console.log('Same id and same status, returning')
-      return
-    }
+    if (activeId === overId && originalStatus === currentStatus) return
 
     // Store original tasks state for rollback on error
     const originalTasks = [...tasks]
@@ -157,8 +146,6 @@ export default function KanbanBoard({ initialTasks, userEmail }: KanbanBoardProp
     // If overId is the activeId itself (dropped on self), use currentStatus which was set by handleDragOver
 
     const supabase = createClient()
-
-    console.log('Status check', { originalStatus, targetStatus, isSameColumn: originalStatus === targetStatus })
 
     // Same column reordering (use originalStatus to check, not activeTask.status which was modified by handleDragOver)
     if (originalStatus === targetStatus) {
@@ -259,14 +246,12 @@ export default function KanbanBoard({ initialTasks, userEmail }: KanbanBoardProp
 
       // Update database with error handling
       try {
-        console.log('Updating database', { activeId, targetStatus, newPosition })
         // Update the moved task's status and position
         const { data: updatedData, error: statusError } = await supabase
           .from('tasks')
           .update({ status: targetStatus, position: newPosition })
           .eq('id', activeId)
           .select()
-        console.log('Database response', { updatedData, statusError })
         if (statusError) throw statusError
         if (!updatedData || updatedData.length === 0) {
           throw new Error('Update failed - no rows affected (possible RLS issue)')

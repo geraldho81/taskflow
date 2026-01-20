@@ -11,11 +11,16 @@ function SortableSubtaskItem({
   subtask,
   onToggle,
   onRemove,
+  onUpdate,
 }: {
   subtask: SubTask
   onToggle: () => void
   onRemove: () => void
+  onUpdate: (text: string) => void
 }) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [editText, setEditText] = useState(subtask.text)
+
   const {
     attributes,
     listeners,
@@ -29,6 +34,26 @@ function SortableSubtaskItem({
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
+  }
+
+  const handleSave = () => {
+    const trimmed = editText.trim()
+    if (trimmed && trimmed !== subtask.text) {
+      onUpdate(trimmed)
+    } else {
+      setEditText(subtask.text)
+    }
+    setIsEditing(false)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handleSave()
+    } else if (e.key === 'Escape') {
+      setEditText(subtask.text)
+      setIsEditing(false)
+    }
   }
 
   return (
@@ -58,14 +83,32 @@ function SortableSubtaskItem({
         onChange={onToggle}
         className="checkbox-custom"
       />
-      <span
-        className={`flex-1 text-[13px] ${subtask.completed ? 'line-through' : ''}`}
-        style={{
-          color: subtask.completed ? 'var(--text-tertiary)' : 'var(--text-primary)',
-        }}
-      >
-        {subtask.text}
-      </span>
+      {isEditing ? (
+        <input
+          type="text"
+          value={editText}
+          onChange={(e) => setEditText(e.target.value)}
+          onBlur={handleSave}
+          onKeyDown={handleKeyDown}
+          className="flex-1 text-[13px] px-2 py-1 rounded border outline-none"
+          style={{
+            background: 'var(--bg-primary)',
+            borderColor: 'var(--accent)',
+            color: 'var(--text-primary)',
+          }}
+          autoFocus
+        />
+      ) : (
+        <span
+          onClick={() => setIsEditing(true)}
+          className={`flex-1 text-[13px] cursor-text px-2 py-1 rounded hover:bg-[var(--bg-hover)] ${subtask.completed ? 'line-through' : ''}`}
+          style={{
+            color: subtask.completed ? 'var(--text-tertiary)' : 'var(--text-primary)',
+          }}
+        >
+          {subtask.text}
+        </span>
+      )}
       <button
         type="button"
         onClick={onRemove}
@@ -188,6 +231,12 @@ export default function TaskModal({ isOpen, onClose, onSubmit, task, viewOnly = 
   const toggleSubtask = (id: string) => {
     setSubtasks((prev) =>
       prev.map((st) => (st.id === id ? { ...st, completed: !st.completed } : st))
+    )
+  }
+
+  const updateSubtask = (id: string, text: string) => {
+    setSubtasks((prev) =>
+      prev.map((st) => (st.id === id ? { ...st, text } : st))
     )
   }
 
@@ -489,6 +538,7 @@ export default function TaskModal({ isOpen, onClose, onSubmit, task, viewOnly = 
                               subtask={subtask}
                               onToggle={() => toggleSubtask(subtask.id)}
                               onRemove={() => removeSubtask(subtask.id)}
+                              onUpdate={(text) => updateSubtask(subtask.id, text)}
                             />
                           </div>
                         ))}
