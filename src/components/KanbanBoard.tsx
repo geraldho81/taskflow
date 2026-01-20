@@ -163,11 +163,15 @@ export default function KanbanBoard({ initialTasks, userEmail }: KanbanBoardProp
         // Batch update positions in database with error handling
         try {
           for (const t of updatedTasks) {
-            const { error } = await supabase
+            const { data, error } = await supabase
               .from('tasks')
               .update({ position: t.position })
               .eq('id', t.id)
+              .select()
             if (error) throw error
+            if (!data || data.length === 0) {
+              throw new Error('Update failed - no rows affected (possible RLS issue)')
+            }
           }
         } catch (error) {
           console.error('Failed to update task positions:', error)
@@ -223,11 +227,15 @@ export default function KanbanBoard({ initialTasks, userEmail }: KanbanBoardProp
       // Update database with error handling
       try {
         // Update the moved task's status and position
-        const { error: statusError } = await supabase
+        const { data: updatedData, error: statusError } = await supabase
           .from('tasks')
           .update({ status: targetStatus, position: newPosition })
           .eq('id', activeId)
+          .select()
         if (statusError) throw statusError
+        if (!updatedData || updatedData.length === 0) {
+          throw new Error('Update failed - no rows affected (possible RLS issue)')
+        }
 
         // Update positions for remaining tasks in old column
         for (const t of updatedOldColumn) {
