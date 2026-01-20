@@ -124,14 +124,18 @@ export default function KanbanBoard({ initialTasks, userEmail }: KanbanBoardProp
     const activeId = active.id as string
     const overId = over.id as string
 
-    if (activeId === overId) {
-      console.log('Same id, returning')
-      return
-    }
-
     const activeTask = tasks.find((t) => t.id === activeId)
     if (!activeTask || !originalStatus) {
       console.log('No activeTask or originalStatus', { activeTask: !!activeTask, originalStatus })
+      return
+    }
+
+    // Get the current status (which may have been updated by handleDragOver)
+    const currentStatus = activeTask.status
+
+    // If dropping on itself AND status hasn't changed, nothing to do
+    if (activeId === overId && originalStatus === currentStatus) {
+      console.log('Same id and same status, returning')
       return
     }
 
@@ -139,15 +143,18 @@ export default function KanbanBoard({ initialTasks, userEmail }: KanbanBoardProp
     const originalTasks = [...tasks]
 
     // Determine target status
-    let targetStatus: TaskStatus = originalStatus
+    // If status was already changed by handleDragOver, use that
+    // Otherwise, determine from what we're dropping on
+    let targetStatus: TaskStatus = currentStatus
     const overColumn = COLUMNS.find((c) => c.id === overId)
-    const overTask = tasks.find((t) => t.id === overId)
+    const overTask = tasks.find((t) => t.id === overId && t.id !== activeId)
 
     if (overColumn) {
       targetStatus = overColumn.id
     } else if (overTask) {
       targetStatus = overTask.status
     }
+    // If overId is the activeId itself (dropped on self), use currentStatus which was set by handleDragOver
 
     const supabase = createClient()
 
