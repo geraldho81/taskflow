@@ -114,15 +114,26 @@ export default function KanbanBoard({ initialTasks, userEmail }: KanbanBoardProp
     const originalStatus = dragStartStatus
     setDragStartStatus(null)
 
-    if (!over) return
+    console.log('handleDragEnd called', { originalStatus, over: over?.id })
+
+    if (!over) {
+      console.log('No over target, returning')
+      return
+    }
 
     const activeId = active.id as string
     const overId = over.id as string
 
-    if (activeId === overId) return
+    if (activeId === overId) {
+      console.log('Same id, returning')
+      return
+    }
 
     const activeTask = tasks.find((t) => t.id === activeId)
-    if (!activeTask || !originalStatus) return
+    if (!activeTask || !originalStatus) {
+      console.log('No activeTask or originalStatus', { activeTask: !!activeTask, originalStatus })
+      return
+    }
 
     // Store original tasks state for rollback on error
     const originalTasks = [...tasks]
@@ -139,6 +150,8 @@ export default function KanbanBoard({ initialTasks, userEmail }: KanbanBoardProp
     }
 
     const supabase = createClient()
+
+    console.log('Status check', { originalStatus, targetStatus, isSameColumn: originalStatus === targetStatus })
 
     // Same column reordering (use originalStatus to check, not activeTask.status which was modified by handleDragOver)
     if (originalStatus === targetStatus) {
@@ -239,12 +252,14 @@ export default function KanbanBoard({ initialTasks, userEmail }: KanbanBoardProp
 
       // Update database with error handling
       try {
+        console.log('Updating database', { activeId, targetStatus, newPosition })
         // Update the moved task's status and position
         const { data: updatedData, error: statusError } = await supabase
           .from('tasks')
           .update({ status: targetStatus, position: newPosition })
           .eq('id', activeId)
           .select()
+        console.log('Database response', { updatedData, statusError })
         if (statusError) throw statusError
         if (!updatedData || updatedData.length === 0) {
           throw new Error('Update failed - no rows affected (possible RLS issue)')
