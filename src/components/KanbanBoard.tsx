@@ -116,6 +116,9 @@ export default function KanbanBoard({ initialTasks, userEmail }: KanbanBoardProp
     const activeTask = tasks.find((t) => t.id === activeId)
     if (!activeTask) return
 
+    // Store original tasks state for rollback on error
+    const originalTasks = [...tasks]
+
     // Determine target status
     let targetStatus: TaskStatus = activeTask.status
     const overColumn = COLUMNS.find((c) => c.id === overId)
@@ -157,12 +160,18 @@ export default function KanbanBoard({ initialTasks, userEmail }: KanbanBoardProp
           })
         )
 
-        // Batch update positions in database
-        for (const t of updatedTasks) {
-          await supabase
-            .from('tasks')
-            .update({ position: t.position })
-            .eq('id', t.id)
+        // Batch update positions in database with error handling
+        try {
+          for (const t of updatedTasks) {
+            const { error } = await supabase
+              .from('tasks')
+              .update({ position: t.position })
+              .eq('id', t.id)
+            if (error) throw error
+          }
+        } catch (error) {
+          console.error('Failed to update task positions:', error)
+          setTasks(originalTasks)
         }
       }
     } else {
@@ -211,28 +220,37 @@ export default function KanbanBoard({ initialTasks, userEmail }: KanbanBoardProp
         })
       )
 
-      // Update database
-      await supabase
-        .from('tasks')
-        .update({ status: targetStatus, position: newPosition })
-        .eq('id', activeId)
-
-      // Update positions for remaining tasks in old column
-      for (const t of updatedOldColumn) {
-        await supabase
+      // Update database with error handling
+      try {
+        // Update the moved task's status and position
+        const { error: statusError } = await supabase
           .from('tasks')
-          .update({ position: t.position })
-          .eq('id', t.id)
-      }
+          .update({ status: targetStatus, position: newPosition })
+          .eq('id', activeId)
+        if (statusError) throw statusError
 
-      // Update positions for tasks in new column
-      for (const t of newColumnTasks) {
-        if (t.id !== activeId) {
-          await supabase
+        // Update positions for remaining tasks in old column
+        for (const t of updatedOldColumn) {
+          const { error } = await supabase
             .from('tasks')
             .update({ position: t.position })
             .eq('id', t.id)
+          if (error) throw error
         }
+
+        // Update positions for tasks in new column
+        for (const t of newColumnTasks) {
+          if (t.id !== activeId) {
+            const { error } = await supabase
+              .from('tasks')
+              .update({ position: t.position })
+              .eq('id', t.id)
+            if (error) throw error
+          }
+        }
+      } catch (error) {
+        console.error('Failed to update task status:', error)
+        setTasks(originalTasks)
       }
     }
   }
