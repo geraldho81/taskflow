@@ -11,10 +11,16 @@ export default async function BoardPage() {
     redirect('/login')
   }
 
-  const { data: tasks } = await supabase
-    .from('tasks')
-    .select('*')
-    .order('position', { ascending: true })
+  const [{ data: tasks }, { data: notes }] = await Promise.all([
+    supabase
+      .from('tasks')
+      .select('*')
+      .order('position', { ascending: true }),
+    supabase
+      .from('notes')
+      .select('*')
+      .order('position', { ascending: true }),
+  ])
 
-  return <KanbanBoard initialTasks={tasks || []} userEmail={user.email || ''} />
+  return <KanbanBoard initialTasks={tasks || []} initialNotes={notes || []} userEmail={user.email || ''} />
 }

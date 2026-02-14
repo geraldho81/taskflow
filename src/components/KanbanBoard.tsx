@@ -3,16 +3,18 @@
 import { useState, useMemo, useEffect } from 'react'
 import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, DragOverlay, pointerWithin } from '@dnd-kit/core'
 import { arrayMove } from '@dnd-kit/sortable'
-import { Task, TaskStatus, SubTask, getTagInfo } from '@/types/database'
+import { Task, TaskStatus, SubTask, Note, NoteColor, getTagInfo } from '@/types/database'
 import { createClient } from '@/lib/supabase/client'
 import Column from './Column'
 import TaskCard from './TaskCard'
 import TaskModal from './TaskModal'
 import ConfirmModal from './ConfirmModal'
 import Header from './Header'
+import NotesPanel from './NotesPanel'
 
 interface KanbanBoardProps {
   initialTasks: Task[]
+  initialNotes: Note[]
   userEmail: string
 }
 
@@ -22,8 +24,9 @@ const COLUMNS: { id: TaskStatus; title: string }[] = [
   { id: 'completed', title: 'DONE' },
 ]
 
-export default function KanbanBoard({ initialTasks, userEmail }: KanbanBoardProps) {
+export default function KanbanBoard({ initialTasks, initialNotes, userEmail }: KanbanBoardProps) {
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
+  const [notes, setNotes] = useState<Note[]>(initialNotes)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
@@ -456,6 +459,63 @@ export default function KanbanBoard({ initialTasks, userEmail }: KanbanBoardProp
       .eq('id', taskId)
   }
 
+  const handleCreateNote = async () => {
+    const supabase = createClient()
+    const maxPosition = notes.length > 0
+      ? Math.max(...notes.map((n) => n.position))
+      : -1
+
+    const { data: newNote, error } = await supabase
+      .from('notes')
+      .insert({
+        content: '',
+        color: 'yellow' as NoteColor,
+        position: maxPosition + 1,
+        user_id: (await supabase.auth.getUser()).data.user!.id,
+      })
+      .select()
+      .single()
+
+    if (!error && newNote) {
+      setNotes((prev) => [...prev, newNote])
+    }
+  }
+
+  const handleUpdateNote = async (id: string, data: { content?: string; color?: NoteColor }) => {
+    // Optimistic update
+    setNotes((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, ...data } : n))
+    )
+
+    const supabase = createClient()
+    const { error } = await supabase
+      .from('notes')
+      .update(data)
+      .eq('id', id)
+
+    if (error) {
+      // Rollback on error
+      setNotes((prev) =>
+        prev.map((n) => {
+          const original = initialNotes.find((on) => on.id === n.id)
+          return n.id === id && original ? original : n
+        })
+      )
+    }
+  }
+
+  const handleDeleteNote = async (id: string) => {
+    const originalNotes = [...notes]
+    setNotes((prev) => prev.filter((n) => n.id !== id))
+
+    const supabase = createClient()
+    const { error } = await supabase.from('notes').delete().eq('id', id)
+
+    if (error) {
+      setNotes(originalNotes)
+    }
+  }
+
   const handleExport = (format: 'json' | 'csv') => {
     const data = tasks.map(({ id, title, description, deadline, status, tags, subtasks, completed_at, created_at }) => ({
       id,
@@ -520,57 +580,68 @@ export default function KanbanBoard({ initialTasks, userEmail }: KanbanBoardProp
       />
 
       <main className="px-6 py-6">
-        {isMounted ? (
-          <DndContext
-            collisionDetection={pointerWithin}
-            onDragStart={handleDragStart}
-            onDragOver={handleDragOver}
-            onDragEnd={handleDragEnd}
-          >
-            <div className="flex gap-6 overflow-x-auto pb-4">
-              {COLUMNS.map((column) => (
-                <Column
-                  key={column.id}
-                  id={column.id}
-                  title={column.title}
-                  tasks={getTasksByStatus(column.id)}
-                  onViewTask={handleViewTask}
-                  onEditTask={handleEditTask}
-                  onDeleteTask={handleDeleteTask}
-                  onToggleSubtask={handleToggleSubtask}
-                />
-              ))}
-            </div>
+        <div className="flex gap-6">
+          <div className="flex-1 min-w-0">
+            {isMounted ? (
+              <DndContext
+                collisionDetection={pointerWithin}
+                onDragStart={handleDragStart}
+                onDragOver={handleDragOver}
+                onDragEnd={handleDragEnd}
+              >
+                <div className="flex gap-6 overflow-x-auto pb-4">
+                  {COLUMNS.map((column) => (
+                    <Column
+                      key={column.id}
+                      id={column.id}
+                      title={column.title}
+                      tasks={getTasksByStatus(column.id)}
+                      onViewTask={handleViewTask}
+                      onEditTask={handleEditTask}
+                      onDeleteTask={handleDeleteTask}
+                      onToggleSubtask={handleToggleSubtask}
+                    />
+                  ))}
+                </div>
 
-            <DragOverlay>
-              {activeTask ? (
-                <TaskCard
-                  task={activeTask}
-                  onView={() => {}}
-                  onEdit={() => {}}
-                  onDelete={() => {}}
-                  onToggleSubtask={() => {}}
-                  isDragging
-                />
-              ) : null}
-            </DragOverlay>
-          </DndContext>
-        ) : (
-          <div className="flex gap-6 overflow-x-auto pb-4">
-            {COLUMNS.map((column) => (
-              <Column
-                key={column.id}
-                id={column.id}
-                title={column.title}
-                tasks={getTasksByStatus(column.id)}
-                onViewTask={handleViewTask}
-                onEditTask={handleEditTask}
-                onDeleteTask={handleDeleteTask}
-                onToggleSubtask={handleToggleSubtask}
-              />
-            ))}
+                <DragOverlay>
+                  {activeTask ? (
+                    <TaskCard
+                      task={activeTask}
+                      onView={() => {}}
+                      onEdit={() => {}}
+                      onDelete={() => {}}
+                      onToggleSubtask={() => {}}
+                      isDragging
+                    />
+                  ) : null}
+                </DragOverlay>
+              </DndContext>
+            ) : (
+              <div className="flex gap-6 overflow-x-auto pb-4">
+                {COLUMNS.map((column) => (
+                  <Column
+                    key={column.id}
+                    id={column.id}
+                    title={column.title}
+                    tasks={getTasksByStatus(column.id)}
+                    onViewTask={handleViewTask}
+                    onEditTask={handleEditTask}
+                    onDeleteTask={handleDeleteTask}
+                    onToggleSubtask={handleToggleSubtask}
+                  />
+                ))}
+              </div>
+            )}
           </div>
-        )}
+
+          <NotesPanel
+            notes={notes}
+            onCreate={handleCreateNote}
+            onUpdate={handleUpdateNote}
+            onDelete={handleDeleteNote}
+          />
+        </div>
       </main>
 
       <TaskModal
