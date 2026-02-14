@@ -164,8 +164,20 @@ function StickyNote({
           }}
           onBlur={handleBlur}
           placeholder="Write something..."
-          className="sticky-note-textarea"
-          style={{ minHeight: 60, resize: 'vertical' }}
+          className="note-textarea"
+          style={{
+            background: 'transparent',
+            border: 'none',
+            outline: 'none',
+            resize: 'none',
+            width: '100%',
+            fontFamily: 'var(--font-body)',
+            fontSize: '13px',
+            lineHeight: 1.5,
+            color: '#5D4037',
+            minHeight: 60,
+            overflow: 'hidden',
+          }}
         />
       </div>
     </div>

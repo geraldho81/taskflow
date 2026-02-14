@@ -666,7 +666,7 @@ export default function KanbanBoard({ initialTasks, initialNotes, userEmail }: K
           </div>
 
           <NotesPanel
-            notes={notes}
+            notes={[...notes].sort((a, b) => a.position - b.position)}
             onCreate={handleCreateNote}
             onUpdate={handleUpdateNote}
             onDelete={handleDeleteNote}

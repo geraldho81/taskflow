@@ -313,39 +313,6 @@ body {
 }
 
 /* Sticky note styles */
-.sticky-note {
-  position: relative;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.sticky-note::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 20px;
-  height: 20px;
-  background: linear-gradient(135deg, transparent 50%, rgba(0, 0, 0, 0.06) 50%);
-  border-bottom-left-radius: 4px;
-  pointer-events: none;
-}
-
-.sticky-note:hover {
-  transform: scale(1.02);
-}
-
-.sticky-note textarea {
-  background: transparent;
-  border: none;
-  outline: none;
-  resize: none;
-  width: 100%;
-  font-family: var(--font-body);
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--text-primary);
-}
-
-.sticky-note textarea::placeholder {
+.note-textarea::placeholder {
   color: rgba(0, 0, 0, 0.3);
 }
