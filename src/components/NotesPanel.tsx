@@ -1,32 +1,32 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import {
-  DndContext,
-  DragEndEvent,
-  DragOverlay,
-  closestCenter,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core'
-import {
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
 import { Note } from '@/types/database'
 
 const NOTE_BG = '#FFF9C4'
 const NOTE_SHADOW = 'rgba(255, 235, 59, 0.3)'
+const MIN_W = 140
+const MIN_H = 80
 
 interface NotesPanelProps {
   notes: Note[]
   onCreate: () => void
   onUpdate: (id: string, data: { content?: string }) => void
   onDelete: (id: string) => void
-  onReorder: (activeId: string, overId: string) => void
+  onMoveNote: (id: string, x: number, y: number) => void
+  onResizeNote: (id: string, w: number, h: number) => void
+}
+
+function useAutoResize(content: string) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const resize = useCallback(() => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = el.scrollHeight + 'px'
+  }, [])
+  useEffect(() => { resize() }, [content, resize])
+  return { textareaRef, resize }
 }
 
 function getRotation(id: string): number {
@@ -34,76 +34,43 @@ function getRotation(id: string): number {
   for (let i = 0; i < id.length; i++) {
     hash = id.charCodeAt(i) + ((hash << 5) - hash)
   }
-  return (Math.abs(hash) % 5) - 2 // -2 to 2 degrees
+  return (Math.abs(hash) % 5) - 2
 }
 
-function useAutoResize(content: string) {
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
-
-  const resize = useCallback(() => {
-    const el = textareaRef.current
-    if (!el) return
-    el.style.height = 'auto'
-    el.style.height = el.scrollHeight + 'px'
-  }, [])
-
-  useEffect(() => {
-    resize()
-  }, [content, resize])
-
-  return { textareaRef, resize }
-}
-
-// Plain overlay version — no sortable hooks
-function StickyNoteOverlay({ note }: { note: Note }) {
-  return (
-    <div
-      className="rounded-lg p-4 pb-3"
-      style={{
-        backgroundColor: NOTE_BG,
-        boxShadow: `0 8px 24px ${NOTE_SHADOW}, 0 4px 8px rgba(0,0,0,0.15)`,
-        transform: 'rotate(0deg) scale(1.03)',
-        width: 248,
-      }}
-    >
-      <div className="text-sm whitespace-pre-wrap" style={{ color: '#5D4037', minHeight: 60 }}>
-        {note.content || 'Write something...'}
-      </div>
-    </div>
-  )
-}
+type ResizeDir = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
 
 function StickyNote({
   note,
   onUpdate,
   onDelete,
+  onMoveNote,
+  onResizeNote,
+  containerRef,
 }: {
   note: Note
   onUpdate: (id: string, data: { content?: string }) => void
   onDelete: (id: string) => void
+  onMoveNote: (id: string, x: number, y: number) => void
+  onResizeNote: (id: string, w: number, h: number) => void
+  containerRef: React.RefObject<HTMLDivElement | null>
 }) {
   const [localContent, setLocalContent] = useState(note.content)
   const { textareaRef, resize } = useAutoResize(localContent)
   const rotation = getRotation(note.id)
 
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: note.id })
+  // Local position/size for smooth dragging (updated optimistically)
+  const [pos, setPos] = useState({ x: note.pos_x, y: note.pos_y })
+  const [size, setSize] = useState({ w: note.width, h: note.height })
+  const [isDragging, setIsDragging] = useState(false)
+  const [isResizing, setIsResizing] = useState(false)
 
-  const style = {
-    transform: isDragging
-      ? CSS.Translate.toString(transform)
-      : CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.4 : 1,
-  }
-
-  // Sync local content when note prop changes
+  // Sync from props when not actively interacting
+  useEffect(() => {
+    if (!isDragging) setPos({ x: note.pos_x, y: note.pos_y })
+  }, [note.pos_x, note.pos_y, isDragging])
+  useEffect(() => {
+    if (!isResizing) setSize({ w: note.width, h: note.height })
+  }, [note.width, note.height, isResizing])
   useEffect(() => {
     setLocalContent(note.content)
   }, [note.content])
@@ -114,27 +81,136 @@ function StickyNote({
     }
   }
 
+  // --- Drag to move ---
+  const handleDragStart = useCallback((e: React.PointerEvent) => {
+    // Only drag from the handle area
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+
+    const startX = e.clientX
+    const startY = e.clientY
+    const startPosX = pos.x
+    const startPosY = pos.y
+    const container = containerRef.current
+    const containerRect = container?.getBoundingClientRect()
+
+    const onMove = (ev: PointerEvent) => {
+      const dx = ev.clientX - startX
+      const dy = ev.clientY - startY
+      let newX = startPosX + dx
+      let newY = startPosY + dy
+
+      // Clamp to container bounds
+      if (containerRect && container) {
+        newX = Math.max(0, Math.min(newX, container.scrollWidth - size.w))
+        newY = Math.max(0, Math.min(newY, container.scrollHeight - size.h))
+      }
+
+      setPos({ x: newX, y: newY })
+    }
+
+    const onUp = () => {
+      setIsDragging(false)
+      document.removeEventListener('pointermove', onMove)
+      document.removeEventListener('pointerup', onUp)
+      // Persist final position
+      setPos((p) => {
+        onMoveNote(note.id, p.x, p.y)
+        return p
+      })
+    }
+
+    document.addEventListener('pointermove', onMove)
+    document.addEventListener('pointerup', onUp)
+  }, [pos.x, pos.y, size.w, size.h, containerRef, note.id, onMoveNote])
+
+  // --- Resize from edges ---
+  const handleResizeStart = useCallback((e: React.PointerEvent, dir: ResizeDir) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsResizing(true)
+
+    const startX = e.clientX
+    const startY = e.clientY
+    const startW = size.w
+    const startH = size.h
+    const startPosX = pos.x
+    const startPosY = pos.y
+
+    const onMove = (ev: PointerEvent) => {
+      const dx = ev.clientX - startX
+      const dy = ev.clientY - startY
+
+      let newW = startW
+      let newH = startH
+      let newX = startPosX
+      let newY = startPosY
+
+      if (dir.includes('e')) newW = Math.max(MIN_W, startW + dx)
+      if (dir.includes('w')) {
+        newW = Math.max(MIN_W, startW - dx)
+        newX = startPosX + (startW - newW)
+      }
+      if (dir.includes('s')) newH = Math.max(MIN_H, startH + dy)
+      if (dir.includes('n')) {
+        newH = Math.max(MIN_H, startH - dy)
+        newY = startPosY + (startH - newH)
+      }
+
+      setSize({ w: newW, h: newH })
+      setPos({ x: newX, y: newY })
+    }
+
+    const onUp = () => {
+      setIsResizing(false)
+      document.removeEventListener('pointermove', onMove)
+      document.removeEventListener('pointerup', onUp)
+      setSize((s) => {
+        onResizeNote(note.id, s.w, s.h)
+        return s
+      })
+      setPos((p) => {
+        onMoveNote(note.id, p.x, p.y)
+        return p
+      })
+    }
+
+    document.addEventListener('pointermove', onMove)
+    document.addEventListener('pointerup', onUp)
+  }, [size.w, size.h, pos.x, pos.y, note.id, onMoveNote, onResizeNote])
+
+  const edgeSize = 6
+  const cornerSize = 10
+
   return (
     <div
-      ref={setNodeRef}
-      style={style}
-      className="group mb-3"
+      className="absolute group"
+      style={{
+        left: pos.x,
+        top: pos.y,
+        width: size.w,
+        height: size.h,
+        zIndex: isDragging || isResizing ? 50 : 1,
+      }}
     >
+      {/* Note body */}
       <div
-        className="rounded-lg p-4 pb-3"
+        className="rounded-lg p-3 pb-2 w-full h-full flex flex-col overflow-hidden"
         style={{
           backgroundColor: NOTE_BG,
-          boxShadow: `0 2px 8px ${NOTE_SHADOW}, 0 1px 3px rgba(0,0,0,0.08)`,
-          transform: `rotate(${rotation}deg)`,
+          boxShadow: isDragging
+            ? `0 8px 24px ${NOTE_SHADOW}, 0 4px 8px rgba(0,0,0,0.15)`
+            : `0 2px 8px ${NOTE_SHADOW}, 0 1px 3px rgba(0,0,0,0.08)`,
+          transform: isDragging ? 'rotate(0deg) scale(1.02)' : `rotate(${rotation}deg)`,
+          transition: isDragging ? 'box-shadow 0.15s' : 'transform 0.15s, box-shadow 0.15s',
         }}
       >
-        {/* Drag handle + delete button row */}
-        <div className="flex items-center justify-between mb-1 -mt-1">
-          <button
-            {...attributes}
-            {...listeners}
-            className="opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing text-black/20 hover:text-black/40 p-0.5"
-            aria-label="Drag to reorder"
+        {/* Header: drag handle + delete */}
+        <div className="flex items-center justify-between mb-1 flex-shrink-0">
+          <div
+            onPointerDown={handleDragStart}
+            className="cursor-grab active:cursor-grabbing text-black/20 hover:text-black/40 p-0.5 touch-none"
           >
             <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
               <circle cx="5" cy="3" r="1.5" />
@@ -144,7 +220,7 @@ function StickyNote({
               <circle cx="5" cy="13" r="1.5" />
               <circle cx="11" cy="13" r="1.5" />
             </svg>
-          </button>
+          </div>
           <button
             onClick={() => onDelete(note.id)}
             className="opacity-0 group-hover:opacity-100 transition-opacity text-black/30 hover:text-black/60 text-sm leading-none cursor-pointer"
@@ -158,13 +234,10 @@ function StickyNote({
         <textarea
           ref={textareaRef}
           value={localContent}
-          onChange={(e) => {
-            setLocalContent(e.target.value)
-            resize()
-          }}
+          onChange={(e) => { setLocalContent(e.target.value); resize() }}
           onBlur={handleBlur}
           placeholder="Write something..."
-          className="note-textarea"
+          className="note-textarea flex-1"
           style={{
             background: 'transparent',
             border: 'none',
@@ -175,35 +248,28 @@ function StickyNote({
             fontSize: '13px',
             lineHeight: 1.5,
             color: '#5D4037',
-            minHeight: 60,
-            overflow: 'hidden',
+            overflow: 'auto',
           }}
         />
       </div>
+
+      {/* Resize handles — edges */}
+      <div onPointerDown={(e) => handleResizeStart(e, 'n')} className="absolute top-0 left-[10px] right-[10px] cursor-ns-resize touch-none" style={{ height: edgeSize }} />
+      <div onPointerDown={(e) => handleResizeStart(e, 's')} className="absolute bottom-0 left-[10px] right-[10px] cursor-ns-resize touch-none" style={{ height: edgeSize }} />
+      <div onPointerDown={(e) => handleResizeStart(e, 'w')} className="absolute left-0 top-[10px] bottom-[10px] cursor-ew-resize touch-none" style={{ width: edgeSize }} />
+      <div onPointerDown={(e) => handleResizeStart(e, 'e')} className="absolute right-0 top-[10px] bottom-[10px] cursor-ew-resize touch-none" style={{ width: edgeSize }} />
+
+      {/* Resize handles — corners */}
+      <div onPointerDown={(e) => handleResizeStart(e, 'nw')} className="absolute top-0 left-0 cursor-nwse-resize touch-none" style={{ width: cornerSize, height: cornerSize }} />
+      <div onPointerDown={(e) => handleResizeStart(e, 'ne')} className="absolute top-0 right-0 cursor-nesw-resize touch-none" style={{ width: cornerSize, height: cornerSize }} />
+      <div onPointerDown={(e) => handleResizeStart(e, 'sw')} className="absolute bottom-0 left-0 cursor-nesw-resize touch-none" style={{ width: cornerSize, height: cornerSize }} />
+      <div onPointerDown={(e) => handleResizeStart(e, 'se')} className="absolute bottom-0 right-0 cursor-nwse-resize touch-none" style={{ width: cornerSize, height: cornerSize }} />
     </div>
   )
 }
 
-export default function NotesPanel({ notes, onCreate, onUpdate, onDelete, onReorder }: NotesPanelProps) {
-  const [activeNote, setActiveNote] = useState<Note | null>(null)
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 5 },
-    })
-  )
-
-  const handleDragStart = (event: { active: { id: string | number } }) => {
-    const note = notes.find((n) => n.id === event.active.id)
-    if (note) setActiveNote(note)
-  }
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    setActiveNote(null)
-    const { active, over } = event
-    if (!over || active.id === over.id) return
-    onReorder(active.id as string, over.id as string)
-  }
+export default function NotesPanel({ notes, onCreate, onUpdate, onDelete, onMoveNote, onResizeNote }: NotesPanelProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
 
   return (
     <aside className="w-[280px] flex-shrink-0 hidden lg:block">
@@ -228,10 +294,11 @@ export default function NotesPanel({ notes, onCreate, onUpdate, onDelete, onReor
         </button>
       </div>
 
-      {/* Notes list */}
+      {/* Free-form canvas */}
       <div
-        className="overflow-y-auto pr-1"
-        style={{ maxHeight: 'calc(100vh - 160px)' }}
+        ref={containerRef}
+        className="relative overflow-auto"
+        style={{ height: 'calc(100vh - 160px)' }}
       >
         {notes.length === 0 ? (
           <p
@@ -241,32 +308,17 @@ export default function NotesPanel({ notes, onCreate, onUpdate, onDelete, onReor
             No notes yet. Click + to add one.
           </p>
         ) : (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={notes.map((n) => n.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              {notes.map((note) => (
-                <StickyNote
-                  key={note.id}
-                  note={note}
-                  onUpdate={onUpdate}
-                  onDelete={onDelete}
-                />
-              ))}
-            </SortableContext>
-
-            <DragOverlay>
-              {activeNote ? (
-                <StickyNoteOverlay note={activeNote} />
-              ) : null}
-            </DragOverlay>
-          </DndContext>
+          notes.map((note) => (
+            <StickyNote
+              key={note.id}
+              note={note}
+              onUpdate={onUpdate}
+              onDelete={onDelete}
+              onMoveNote={onMoveNote}
+              onResizeNote={onResizeNote}
+              containerRef={containerRef}
+            />
+          ))
         )}
       </div>
     </aside>

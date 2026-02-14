@@ -465,12 +465,20 @@ export default function KanbanBoard({ initialTasks, initialNotes, userEmail }: K
       ? Math.max(...notes.map((n) => n.position))
       : -1
 
+    // Stack new notes vertically with some offset
+    const posY = notes.length * 10
+    const posX = notes.length * 5
+
     const { data: newNote, error } = await supabase
       .from('notes')
       .insert({
         content: '',
         color: 'yellow',
         position: maxPosition + 1,
+        pos_x: posX,
+        pos_y: posY,
+        width: 200,
+        height: 120,
         user_id: (await supabase.auth.getUser()).data.user!.id,
       })
       .select()
@@ -482,7 +490,6 @@ export default function KanbanBoard({ initialTasks, initialNotes, userEmail }: K
   }
 
   const handleUpdateNote = async (id: string, data: { content?: string }) => {
-    // Optimistic update
     setNotes((prev) =>
       prev.map((n) => (n.id === id ? { ...n, ...data } : n))
     )
@@ -494,7 +501,6 @@ export default function KanbanBoard({ initialTasks, initialNotes, userEmail }: K
       .eq('id', id)
 
     if (error) {
-      // Rollback on error
       setNotes((prev) =>
         prev.map((n) => {
           const original = initialNotes.find((on) => on.id === n.id)
@@ -504,34 +510,28 @@ export default function KanbanBoard({ initialTasks, initialNotes, userEmail }: K
     }
   }
 
-  const handleReorderNotes = async (activeId: string, overId: string) => {
-    const sortedNotes = [...notes].sort((a, b) => a.position - b.position)
-    const oldIndex = sortedNotes.findIndex((n) => n.id === activeId)
-    const newIndex = sortedNotes.findIndex((n) => n.id === overId)
-    if (oldIndex === -1 || newIndex === -1) return
+  const handleMoveNote = async (id: string, x: number, y: number) => {
+    setNotes((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, pos_x: x, pos_y: y } : n))
+    )
 
-    const reordered = arrayMove(sortedNotes, oldIndex, newIndex).map((n, i) => ({
-      ...n,
-      position: i,
-    }))
-
-    // Optimistic update
-    setNotes(reordered)
-
-    // Persist to Supabase
     const supabase = createClient()
-    try {
-      for (const n of reordered) {
-        const { error } = await supabase
-          .from('notes')
-          .update({ position: n.position })
-          .eq('id', n.id)
-        if (error) throw error
-      }
-    } catch (error) {
-      console.error('Failed to reorder notes:', error)
-      setNotes(sortedNotes)
-    }
+    await supabase
+      .from('notes')
+      .update({ pos_x: x, pos_y: y })
+      .eq('id', id)
+  }
+
+  const handleResizeNote = async (id: string, w: number, h: number) => {
+    setNotes((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, width: w, height: h } : n))
+    )
+
+    const supabase = createClient()
+    await supabase
+      .from('notes')
+      .update({ width: w, height: h })
+      .eq('id', id)
   }
 
   const handleDeleteNote = async (id: string) => {
@@ -666,11 +666,12 @@ export default function KanbanBoard({ initialTasks, initialNotes, userEmail }: K
           </div>
 
           <NotesPanel
-            notes={[...notes].sort((a, b) => a.position - b.position)}
+            notes={notes}
             onCreate={handleCreateNote}
             onUpdate={handleUpdateNote}
             onDelete={handleDeleteNote}
-            onReorder={handleReorderNotes}
+            onMoveNote={handleMoveNote}
+            onResizeNote={handleResizeNote}
           />
         </div>
       </main>

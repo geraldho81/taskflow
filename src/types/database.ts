@@ -63,6 +63,10 @@ export interface Note {
   content: string
   color: string
   position: number
+  pos_x: number
+  pos_y: number
+  width: number
+  height: number
   created_at: string
   updated_at: string
 }
