@@ -274,7 +274,7 @@ export default function NotesPanel({ notes, onCreate, onUpdate, onDelete, onMove
   return (
     <aside className="flex-1 min-w-[200px] hidden lg:block">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4 px-1">
+      <div className="flex items-center gap-2 mb-4 px-1">
         <h2
           className="text-sm font-semibold uppercase tracking-wider"
           style={{ color: 'var(--text-secondary)' }}
