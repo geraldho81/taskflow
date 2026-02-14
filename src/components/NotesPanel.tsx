@@ -272,7 +272,7 @@ export default function NotesPanel({ notes, onCreate, onUpdate, onDelete, onMove
   const containerRef = useRef<HTMLDivElement>(null)
 
   return (
-    <aside className="w-[280px] flex-shrink-0 hidden lg:block">
+    <aside className="flex-1 min-w-[200px] hidden lg:block">
       {/* Header */}
       <div className="flex items-center justify-between mb-4 px-1">
         <h2
