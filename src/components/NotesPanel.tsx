@@ -54,16 +54,33 @@ function useAutoResize(content: string) {
   return { textareaRef, resize }
 }
 
+// Plain overlay version — no sortable hooks
+function StickyNoteOverlay({ note }: { note: Note }) {
+  return (
+    <div
+      className="rounded-lg p-4 pb-3"
+      style={{
+        backgroundColor: NOTE_BG,
+        boxShadow: `0 8px 24px ${NOTE_SHADOW}, 0 4px 8px rgba(0,0,0,0.15)`,
+        transform: 'rotate(0deg) scale(1.03)',
+        width: 248,
+      }}
+    >
+      <div className="text-sm whitespace-pre-wrap" style={{ color: '#5D4037', minHeight: 60 }}>
+        {note.content || 'Write something...'}
+      </div>
+    </div>
+  )
+}
+
 function StickyNote({
   note,
   onUpdate,
   onDelete,
-  isDragging,
 }: {
   note: Note
   onUpdate: (id: string, data: { content?: string }) => void
   onDelete: (id: string) => void
-  isDragging?: boolean
 }) {
   const [localContent, setLocalContent] = useState(note.content)
   const { textareaRef, resize } = useAutoResize(localContent)
@@ -75,18 +92,18 @@ function StickyNote({
     setNodeRef,
     transform,
     transition,
-    isDragging: isSortableDragging,
+    isDragging,
   } = useSortable({ id: note.id })
 
   const style = {
-    transform: isSortableDragging
+    transform: isDragging
       ? CSS.Translate.toString(transform)
       : CSS.Transform.toString(transform),
     transition,
-    opacity: isSortableDragging ? 0.4 : 1,
+    opacity: isDragging ? 0.4 : 1,
   }
 
-  // Sync local content when note prop changes (e.g. after reorder)
+  // Sync local content when note prop changes
   useEffect(() => {
     setLocalContent(note.content)
   }, [note.content])
@@ -97,30 +114,11 @@ function StickyNote({
     }
   }
 
-  if (isDragging) {
-    // Overlay version — no sortable hooks, just visual
-    return (
-      <div
-        className="sticky-note group rounded-lg p-4 pb-3"
-        style={{
-          backgroundColor: NOTE_BG,
-          boxShadow: `0 8px 24px ${NOTE_SHADOW}, 0 4px 8px rgba(0,0,0,0.15)`,
-          transform: 'rotate(0deg) scale(1.03)',
-          width: 248,
-        }}
-      >
-        <div className="text-sm whitespace-pre-wrap" style={{ color: '#5D4037', minHeight: 60 }}>
-          {note.content || 'Write something...'}
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className="sticky-note group rounded-lg p-4 pb-3 mb-3"
+      className="group mb-3"
     >
       <div
         className="rounded-lg p-4 pb-3"
@@ -167,7 +165,7 @@ function StickyNote({
           onBlur={handleBlur}
           placeholder="Write something..."
           className="sticky-note-textarea"
-          style={{ minHeight: 60, overflow: 'hidden', resize: 'none' }}
+          style={{ minHeight: 60, resize: 'vertical' }}
         />
       </div>
     </div>
@@ -253,12 +251,7 @@ export default function NotesPanel({ notes, onCreate, onUpdate, onDelete, onReor
 
             <DragOverlay>
               {activeNote ? (
-                <StickyNote
-                  note={activeNote}
-                  onUpdate={() => {}}
-                  onDelete={() => {}}
-                  isDragging
-                />
+                <StickyNoteOverlay note={activeNote} />
               ) : null}
             </DragOverlay>
           </DndContext>
