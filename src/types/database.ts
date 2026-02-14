@@ -57,24 +57,14 @@ export interface UpdateTaskInput {
 }
 
 // Note types
-export type NoteColor = 'yellow' | 'pink' | 'blue' | 'green' | 'purple'
-
 export interface Note {
   id: string
   user_id: string
   content: string
-  color: NoteColor
+  color: string
   position: number
   created_at: string
   updated_at: string
-}
-
-export const NOTE_COLORS: Record<NoteColor, { bg: string; shadow: string }> = {
-  yellow: { bg: '#FFF9C4', shadow: 'rgba(255, 235, 59, 0.3)' },
-  pink:   { bg: '#F8BBD0', shadow: 'rgba(233, 30, 99, 0.2)' },
-  blue:   { bg: '#BBDEFB', shadow: 'rgba(33, 150, 243, 0.2)' },
-  green:  { bg: '#C8E6C9', shadow: 'rgba(76, 175, 80, 0.2)' },
-  purple: { bg: '#E1BEE7', shadow: 'rgba(156, 39, 176, 0.2)' },
 }
 
 export interface Database {
