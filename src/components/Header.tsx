@@ -35,10 +35,12 @@ export default function Header({
       background: 'var(--bg-card)',
       borderColor: 'var(--border-light)'
     }}>
-      <div className="px-6 py-4">
-        <div className="flex items-center justify-between gap-6">
-          {/* Logo */}
-          <div className="flex items-center gap-3">
+      <div className="px-3 py-3 sm:px-6 sm:py-4">
+        {/* Mobile: two rows — logo+actions on top, search below */}
+        {/* Desktop: single row — logo, search, actions */}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-2 sm:flex-nowrap sm:gap-x-6">
+          {/* Logo — order 1 always */}
+          <div className="flex items-center gap-3 order-1">
             <div
               className="w-8 h-8 rounded-lg flex items-center justify-center"
               style={{ background: 'var(--accent)' }}
@@ -55,42 +57,8 @@ export default function Header({
             </h1>
           </div>
 
-          {/* Search */}
-          <div className="flex-1 max-w-md">
-            <div className="relative">
-              <svg
-                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
-                style={{ color: 'var(--text-tertiary)' }}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-              <input
-                type="text"
-                placeholder="Search tasks..."
-                value={searchQuery}
-                onChange={(e) => onSearchChange(e.target.value)}
-                className="w-full py-2 pr-4 rounded-md"
-                style={{
-                  background: 'var(--bg-secondary)',
-                  border: '1px solid var(--border-light)',
-                  fontSize: '13px',
-                  paddingLeft: '36px',
-                  color: 'var(--text-primary)'
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className="flex items-center gap-3">
+          {/* Actions — order 2 on mobile (same row as logo, right-aligned), order 3 on sm+ */}
+          <div className="flex items-center gap-2 sm:gap-3 order-2 ml-auto sm:ml-0 sm:order-3">
             <button
               onClick={onNewTask}
               className="btn btn-primary"
@@ -225,6 +193,40 @@ export default function Header({
                   </div>
                 </>
               )}
+            </div>
+          </div>
+
+          {/* Search — order 3 on mobile (wraps to full-width second row), order 2 on sm+ */}
+          <div className="order-3 w-full sm:order-2 sm:flex-1 sm:w-auto sm:max-w-md">
+            <div className="relative">
+              <svg
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
+                style={{ color: 'var(--text-tertiary)' }}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+              <input
+                type="text"
+                placeholder="Search tasks..."
+                value={searchQuery}
+                onChange={(e) => onSearchChange(e.target.value)}
+                className="w-full py-2 pr-4 rounded-md"
+                style={{
+                  background: 'var(--bg-secondary)',
+                  border: '1px solid var(--border-light)',
+                  fontSize: '13px',
+                  paddingLeft: '36px',
+                  color: 'var(--text-primary)'
+                }}
+              />
             </div>
           </div>
         </div>

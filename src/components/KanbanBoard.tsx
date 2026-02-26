@@ -609,9 +609,9 @@ export default function KanbanBoard({ initialTasks, initialNotes, userEmail }: K
         }}
       />
 
-      <main className="px-6 py-6">
-        <div className="flex gap-6">
-          <div className="shrink-0" style={{ width: 'fit-content', maxWidth: '70%' }}>
+      <main className="px-3 py-4 sm:px-6 sm:py-6">
+        <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
+          <div className="w-full lg:w-fit lg:shrink-0">
             {isMounted ? (
               <DndContext
                 collisionDetection={pointerWithin}
@@ -619,7 +619,7 @@ export default function KanbanBoard({ initialTasks, initialNotes, userEmail }: K
                 onDragOver={handleDragOver}
                 onDragEnd={handleDragEnd}
               >
-                <div className="flex gap-6 overflow-x-auto pb-4">
+                <div className="flex gap-3 sm:gap-6 overflow-x-auto pb-4">
                   {COLUMNS.map((column) => (
                     <Column
                       key={column.id}
@@ -648,7 +648,7 @@ export default function KanbanBoard({ initialTasks, initialNotes, userEmail }: K
                 </DragOverlay>
               </DndContext>
             ) : (
-              <div className="flex gap-6 overflow-x-auto pb-4">
+              <div className="flex gap-3 sm:gap-6 overflow-x-auto pb-4">
                 {COLUMNS.map((column) => (
                   <Column
                     key={column.id}

@@ -36,10 +36,10 @@ export default function Column({
   return (
     <div
       ref={setNodeRef}
-      className="flex-1 min-w-[320px] max-w-[400px] flex flex-col"
+      className="flex-none w-[82vw] sm:flex-1 sm:w-auto sm:min-w-[320px] sm:max-w-[400px] flex flex-col"
       style={{
-        height: 'calc(100vh - 140px)',
-        maxHeight: 'calc(100vh - 140px)'
+        height: 'calc(100vh - 130px)',
+        maxHeight: 'calc(100vh - 130px)'
       }}
     >
       {/* Column Header */}
