@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, DragOverlay, pointerWithin } from '@dnd-kit/core'
+import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, DragOverlay, pointerWithin, MouseSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { arrayMove } from '@dnd-kit/sortable'
 import { Task, TaskStatus, SubTask, Note, getTagInfo } from '@/types/database'
 import { createClient } from '@/lib/supabase/client'
@@ -38,6 +38,11 @@ export default function KanbanBoard({ initialTasks, initialNotes, userEmail }: K
   })
   const [isMounted, setIsMounted] = useState(false)
   const [dragStartStatus, setDragStartStatus] = useState<TaskStatus | null>(null)
+
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+  )
 
   // Prevent hydration mismatch from dnd-kit
   useEffect(() => {
@@ -614,6 +619,7 @@ export default function KanbanBoard({ initialTasks, initialNotes, userEmail }: K
           <div className="w-full lg:w-fit lg:shrink-0">
             {isMounted ? (
               <DndContext
+                sensors={sensors}
                 collisionDetection={pointerWithin}
                 onDragStart={handleDragStart}
                 onDragOver={handleDragOver}

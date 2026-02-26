@@ -76,7 +76,7 @@ export default function TaskCard({
         <div
           {...attributes}
           {...listeners}
-          className="cursor-grab active:cursor-grabbing p-1 -ml-1 mt-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
+          className="cursor-grab active:cursor-grabbing p-1 -ml-1 mt-0.5 rounded flex opacity-25 md:opacity-0 md:group-hover:opacity-100 transition-opacity touch-none"
           style={{ color: 'var(--text-tertiary)' }}
         >
           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
